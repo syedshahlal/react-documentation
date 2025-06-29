@@ -170,7 +170,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
+              <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
                 <div className="w-8 h-8 rounded-lg overflow-hidden">
                   <img src="/BAC.png" alt="BAC Logo" className="w-full h-full object-cover" />
                 </div>
@@ -178,7 +178,7 @@ export default function HomePage() {
                   <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">GRA Core Platform</h1>
                   <p className="text-sm text-slate-600 dark:text-slate-400">Documentation</p>
                 </div>
-              </div>
+              </Link>
             </div>
 
             {/* Center Tabs */}
