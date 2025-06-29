@@ -8,77 +8,76 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Book, Users, Code, Layers, Wrench, Database, ChevronDown, ChevronRight, Home, Search, X } from "lucide-react"
-import { promises as fs } from "fs"
-import path from "path"
+import {
+  Book,
+  Users,
+  Code,
+  Layers,
+  Wrench,
+  Database,
+  ChevronDown,
+  ChevronRight,
+  Home,
+  Search,
+  X,
+  Folder,
+  FileText,
+} from "lucide-react"
 
-// Dynamic navigation generation from docs folder
-async function generateNavigation() {
-  try {
-    const docsPath = path.join(process.cwd(), "docs")
-    const files = await fs.readdir(docsPath)
-
-    const navigation = [
-      {
-        title: "Documentation",
-        items: await Promise.all(
-          files
-            .filter((file) => file.endsWith(".md"))
-            .map(async (file) => {
-              const filePath = path.join(docsPath, file)
-              const content = await fs.readFile(filePath, "utf-8")
-              const titleMatch = content.match(/^#\s+(.+)$/m)
-              const title = titleMatch ? titleMatch[1] : file.replace(".md", "").replace(/-/g, " ")
-              const slug = file.replace(".md", "")
-
-              // Determine icon based on filename
-              let icon = Book
-              if (slug.includes("api")) icon = Code
-              if (slug.includes("guide")) icon = Users
-              if (slug.includes("introduction")) icon = Home
-              if (slug.includes("architecture")) icon = Database
-              if (slug.includes("example")) icon = Layers
-
-              return {
-                title: title.charAt(0).toUpperCase() + title.slice(1),
-                href: `/docs/${slug}`,
-                icon,
-              }
-            }),
-        ),
-      },
-    ]
-
-    return navigation
-  } catch (error) {
-    console.error("Error reading docs folder:", error)
-    // Fallback to original navigation
-    return [
-      {
-        title: "Getting Started",
-        items: [
-          { title: "Introduction", href: "/docs/introduction", icon: Book },
-          { title: "Quick Start", href: "/docs/quick-start", icon: Home },
-          { title: "Installation", href: "/docs/installation", icon: Wrench },
-        ],
-      },
-      {
-        title: "Guides",
-        items: [
-          { title: "User Guide", href: "/docs/user-guide", icon: Users },
-          { title: "Development Guide", href: "/docs/development", icon: Wrench },
-          { title: "Examples & Tutorials", href: "/docs/examples", icon: Layers },
-        ],
-      },
-      {
-        title: "Reference",
-        items: [
-          { title: "API Reference", href: "/docs/api-reference", icon: Code },
-          { title: "Platform Architecture", href: "/docs/architecture", icon: Database },
-        ],
-      },
-    ]
-  }
+// Dynamic navigation structure that would be generated from docs folder
+const generateNavigationFromDocs = () => {
+  // This would typically come from an API route that reads the file system
+  // For now, we'll simulate a folder structure
+  return [
+    {
+      title: "Getting Started",
+      type: "folder",
+      items: [
+        { title: "Introduction", href: "/docs/getting-started/introduction", icon: Home, type: "file" },
+        { title: "Quick Start", href: "/docs/getting-started/quick-start", icon: Book, type: "file" },
+        { title: "Installation", href: "/docs/getting-started/installation", icon: Wrench, type: "file" },
+      ],
+    },
+    {
+      title: "Guides",
+      type: "folder",
+      items: [
+        { title: "User Guide", href: "/docs/guides/user-guide", icon: Users, type: "file" },
+        { title: "Development Guide", href: "/docs/guides/development", icon: Wrench, type: "file" },
+        { title: "Examples & Tutorials", href: "/docs/guides/examples", icon: Layers, type: "file" },
+        {
+          title: "Advanced",
+          type: "folder",
+          items: [
+            { title: "Custom Plugins", href: "/docs/guides/advanced/plugins", icon: Code, type: "file" },
+            { title: "Performance", href: "/docs/guides/advanced/performance", icon: Database, type: "file" },
+          ],
+        },
+      ],
+    },
+    {
+      title: "API Reference",
+      type: "folder",
+      items: [
+        { title: "Authentication", href: "/docs/api/authentication", icon: Code, type: "file" },
+        { title: "Users API", href: "/docs/api/users", icon: Code, type: "file" },
+        { title: "Data API", href: "/docs/api/data", icon: Code, type: "file" },
+      ],
+    },
+    {
+      title: "Architecture",
+      type: "folder",
+      items: [
+        { title: "Overview", href: "/docs/architecture/overview", icon: Database, type: "file" },
+        { title: "Security", href: "/docs/architecture/security", icon: Database, type: "file" },
+        { title: "Scalability", href: "/docs/architecture/scalability", icon: Database, type: "file" },
+      ],
+    },
+    // Direct files at root level
+    { title: "Introduction", href: "/docs/introduction", icon: Book, type: "file" },
+    { title: "User Guide", href: "/docs/user-guide", icon: Users, type: "file" },
+    { title: "API Reference", href: "/docs/api-reference", icon: Code, type: "file" },
+  ]
 }
 
 // Mock markdown content - in a real app, this would be loaded from your actual .md files
@@ -252,150 +251,16 @@ Manage your API keys through the dashboard or programmatically.
 All API endpoints are rate limited to ensure fair usage.`,
     href: "/docs/api-reference",
   },
-  examples: {
-    title: "Examples & Tutorials",
-    content: `# Examples & Tutorials
-
-Real-world examples and step-by-step tutorials for common use cases.
-
-## Quick Start Examples
-
-### Basic Setup
-
-import { GRACore } from '@gra-core/platform'
-
-const client = new GRACore({
-  apiKey: process.env.GRA_API_KEY,
-  environment: 'production'
-})
-
-### Creating Your First Resource
-
-const resource = await client.resources.create({
-  name: 'My First Resource',
-  type: 'data-source'
-})
-
-## Advanced Examples
-
-### Real-time Data Processing
-
-Learn how to process data in real-time with our streaming APIs.
-
-### Custom Integrations
-
-Build custom integrations with third-party services.
-
-### Authentication Examples
-
-Examples of implementing authentication in different frameworks.
-
-### Database Integration
-
-Connect your application to various database systems.`,
-    href: "/docs/examples",
-  },
-  development: {
-    title: "Development Guide",
-    content: `# Development Guide
-
-Development workflows, contribution guidelines, and advanced topics.
-
-## Development Environment
-
-### Prerequisites
-
-- Node.js 18+
-- Docker
-- Git
-
-### Setup
-
-git clone https://github.com/gra-core/platform
-cd platform
-npm install
-npm run dev
-
-## Contributing
-
-### Code Style
-
-We use ESLint and Prettier for code formatting.
-
-### Testing
-
-Run tests with:
-
-npm test
-
-## Advanced Topics
-
-### Custom Plugins
-
-Learn how to create custom plugins for the platform.
-
-### Performance Optimization
-
-Best practices for optimizing your GRA Core applications.
-
-### Debugging
-
-Tools and techniques for debugging your applications.
-
-### Deployment
-
-Deploy your applications to various cloud platforms.`,
-    href: "/docs/development",
-  },
-  architecture: {
-    title: "Platform Architecture",
-    content: `# Platform Architecture
-
-Deep dive into GRA Core Platform architecture and infrastructure.
-
-## System Overview
-
-The GRA Core Platform is built on a microservices architecture with the following components:
-
-- API Gateway: Routes requests and handles authentication
-- Core Services: Business logic and data processing
-- Data Layer: Distributed database and caching
-- Message Queue: Asynchronous processing and events
-
-## Scalability
-
-### Horizontal Scaling
-
-The platform automatically scales based on demand.
-
-### Load Balancing
-
-Traffic is distributed across multiple instances.
-
-## Security
-
-### Authentication
-
-Multi-factor authentication and OAuth 2.0 support.
-
-### Data Encryption
-
-All data is encrypted at rest and in transit.
-
-### Network Security
-
-Secure network configurations and firewall rules.
-
-## Database Architecture
-
-Learn about our database design and optimization strategies.`,
-    href: "/docs/architecture",
-  },
 }
 
 export function Sidebar() {
   const pathname = usePathname()
-  const [expandedSections, setExpandedSections] = useState<string[]>(["Documentation"])
+  const [expandedSections, setExpandedSections] = useState<string[]>([
+    "Getting Started",
+    "Guides",
+    "API Reference",
+    "Architecture",
+  ])
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -404,7 +269,8 @@ export function Sidebar() {
 
   // Load navigation on component mount
   useEffect(() => {
-    generateNavigation().then(setNavigation)
+    const nav = generateNavigationFromDocs()
+    setNavigation(nav)
   }, [])
 
   const toggleSection = (title: string) => {
@@ -422,18 +288,34 @@ export function Sidebar() {
     const results: any[] = []
     const queryLower = query.toLowerCase()
 
-    // Search through navigation items
-    navigation.forEach((section) => {
-      section.items.forEach((item) => {
-        if (item.title.toLowerCase().includes(queryLower)) {
+    // Recursive function to search through nested navigation
+    const searchNavigation = (items: any[], sectionTitle: string) => {
+      items.forEach((item) => {
+        if (item.type === "folder" && item.items) {
+          searchNavigation(item.items, item.title)
+        } else if (item.type === "file" && item.title.toLowerCase().includes(queryLower)) {
           results.push({
             ...item,
-            section: section.title,
+            section: sectionTitle,
             type: "navigation",
-            snippet: `Found in ${section.title} navigation`,
+            snippet: `Found in ${sectionTitle} navigation`,
           })
         }
       })
+    }
+
+    // Search through navigation items
+    navigation.forEach((section) => {
+      if (section.type === "folder" && section.items) {
+        searchNavigation(section.items, section.title)
+      } else if (section.type === "file" && section.title.toLowerCase().includes(queryLower)) {
+        results.push({
+          ...section,
+          section: "Root",
+          type: "navigation",
+          snippet: `Found in root navigation`,
+        })
+      }
     })
 
     // Search through markdown content
@@ -509,6 +391,62 @@ export function Sidebar() {
     setSearchQuery("")
     setSearchResults([])
     setIsSearching(false)
+  }
+
+  // Recursive component to render navigation items
+  const NavigationItem = ({ item, level = 0 }: { item: any; level?: number }) => {
+    if (item.type === "folder") {
+      return (
+        <div key={item.title} style={{ marginLeft: `${level * 12}px` }}>
+          <Button
+            variant="ghost"
+            className="w-full justify-between p-2 h-auto font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
+            onClick={() => toggleSection(item.title)}
+          >
+            <div className="flex items-center">
+              <Folder className="w-4 h-4 mr-2" />
+              {item.title}
+            </div>
+            {expandedSections.includes(item.title) ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </Button>
+
+          {expandedSections.includes(item.title) && (
+            <div className="mt-1 space-y-1">
+              {item.items.map((subItem: any) => (
+                <NavigationItem key={subItem.title || subItem.href} item={subItem} level={level + 1} />
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    } else {
+      // File item
+      const IconComponent = item.icon || FileText
+      const isActive = pathname === item.href
+
+      return (
+        <Link key={item.href} href={item.href}>
+          <Button
+            variant="ghost"
+            className={cn(
+              "w-full justify-start p-2 h-auto text-sm",
+              isActive
+                ? "bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600 dark:border-blue-400"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800",
+            )}
+            style={{ marginLeft: `${level * 12}px` }}
+            onClick={() => setIsMobileOpen(false)}
+          >
+            <IconComponent className="w-4 h-4 mr-2" />
+            {item.title}
+          </Button>
+        </Link>
+      )
+    }
   }
 
   const SidebarContent = () => (
@@ -594,49 +532,11 @@ export function Sidebar() {
             </div>
           ) : (
             // Default Navigation
-            navigation.map((section) => (
-              <div key={section.title}>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-between p-2 h-auto font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  onClick={() => toggleSection(section.title)}
-                >
-                  {section.title}
-                  {expandedSections.includes(section.title) ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                </Button>
-
-                {expandedSections.includes(section.title) && (
-                  <div className="ml-2 mt-1 space-y-1">
-                    {section.items.map((item) => {
-                      const IconComponent = item.icon
-                      const isActive = pathname === item.href
-
-                      return (
-                        <Link key={item.href} href={item.href}>
-                          <Button
-                            variant="ghost"
-                            className={cn(
-                              "w-full justify-start p-2 h-auto text-sm",
-                              isActive
-                                ? "bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600 dark:border-blue-400"
-                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800",
-                            )}
-                            onClick={() => setIsMobileOpen(false)}
-                          >
-                            <IconComponent className="w-4 h-4 mr-2" />
-                            {item.title}
-                          </Button>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            ))
+            <div className="space-y-1">
+              {navigation.map((item) => (
+                <NavigationItem key={item.title || item.href} item={item} />
+              ))}
+            </div>
           )}
         </div>
       </ScrollArea>
