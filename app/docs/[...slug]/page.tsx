@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { DocContent } from "@/components/doc-content"
-import { TableOfContents } from "@/components/table-of-contents"
 import { Breadcrumb } from "@/components/breadcrumb"
 import { PageNavigation } from "@/components/page-navigation"
 import { Badge } from "@/components/ui/badge"
@@ -410,18 +409,12 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
               <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 max-w-none">
                 <Breadcrumb slug={slug} />
 
-                <div className="flex flex-col xl:flex-row gap-6 lg:gap-8">
+                <div className="flex flex-col gap-6 lg:gap-8">
                   <div className="flex-1 min-w-0">
                     <DocContent title={doc.title} content={doc.content} lastUpdated={doc.lastUpdated} />
 
                     {/* Page Navigation */}
                     <PageNavigation previousPage={previousPage} nextPage={nextPage} />
-                  </div>
-
-                  <div className="xl:w-64 xl:flex-shrink-0">
-                    <div className="sticky top-32">
-                      <TableOfContents content={doc.content} />
-                    </div>
                   </div>
                 </div>
               </div>
