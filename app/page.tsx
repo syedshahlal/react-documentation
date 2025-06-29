@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Book, Users, Code, Layers, Wrench, Database, ArrowRight, Search, Menu } from "lucide-react"
+import { Book, Users, Code, Layers, Wrench, Database, ArrowRight, Search, Menu } from 'lucide-react'
 import Link from "next/link"
 import { Banner } from "@/components/banner"
 
@@ -117,15 +117,19 @@ export default function HomePage() {
               <button className="text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 pb-1">
                 About
               </button>
-              <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
-                User Guide
-              </button>
+              <Link href="/docs/user-guide">
+                <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+                  User Guide
+                </button>
+              </Link>
               <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
                 Example
               </button>
-              <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
-                Create Doc
-              </button>
+              <Link href="/create-doc">
+                <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+                  Create Doc
+                </button>
+              </Link>
               <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
                 GCP BOW
               </button>
