@@ -1,3 +1,5 @@
+# User Guide
+
 This comprehensive user guide will walk you through all aspects of using GRA Core Platform.
 
 ## Table of Contents
