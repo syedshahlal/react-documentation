@@ -2,39 +2,84 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Book, Users, Code, Layers, Wrench, Database, ChevronDown, ChevronRight, Home, Search, X } from "lucide-react"
+import { promises as fs } from "fs"
+import path from "path"
 
-const navigation = [
-  {
-    title: "Getting Started",
-    items: [
-      { title: "Introduction", href: "/docs/introduction", icon: Book },
-      { title: "Quick Start", href: "/docs/quick-start", icon: Home },
-      { title: "Installation", href: "/docs/installation", icon: Wrench },
-    ],
-  },
-  {
-    title: "Guides",
-    items: [
-      { title: "User Guide", href: "/docs/user-guide", icon: Users },
-      { title: "Development Guide", href: "/docs/development", icon: Wrench },
-      { title: "Examples & Tutorials", href: "/docs/examples", icon: Layers },
-    ],
-  },
-  {
-    title: "Reference",
-    items: [
-      { title: "API Reference", href: "/docs/api-reference", icon: Code },
-      { title: "Platform Architecture", href: "/docs/architecture", icon: Database },
-    ],
-  },
-]
+// Dynamic navigation generation from docs folder
+async function generateNavigation() {
+  try {
+    const docsPath = path.join(process.cwd(), "docs")
+    const files = await fs.readdir(docsPath)
+
+    const navigation = [
+      {
+        title: "Documentation",
+        items: await Promise.all(
+          files
+            .filter((file) => file.endsWith(".md"))
+            .map(async (file) => {
+              const filePath = path.join(docsPath, file)
+              const content = await fs.readFile(filePath, "utf-8")
+              const titleMatch = content.match(/^#\s+(.+)$/m)
+              const title = titleMatch ? titleMatch[1] : file.replace(".md", "").replace(/-/g, " ")
+              const slug = file.replace(".md", "")
+
+              // Determine icon based on filename
+              let icon = Book
+              if (slug.includes("api")) icon = Code
+              if (slug.includes("guide")) icon = Users
+              if (slug.includes("introduction")) icon = Home
+              if (slug.includes("architecture")) icon = Database
+              if (slug.includes("example")) icon = Layers
+
+              return {
+                title: title.charAt(0).toUpperCase() + title.slice(1),
+                href: `/docs/${slug}`,
+                icon,
+              }
+            }),
+        ),
+      },
+    ]
+
+    return navigation
+  } catch (error) {
+    console.error("Error reading docs folder:", error)
+    // Fallback to original navigation
+    return [
+      {
+        title: "Getting Started",
+        items: [
+          { title: "Introduction", href: "/docs/introduction", icon: Book },
+          { title: "Quick Start", href: "/docs/quick-start", icon: Home },
+          { title: "Installation", href: "/docs/installation", icon: Wrench },
+        ],
+      },
+      {
+        title: "Guides",
+        items: [
+          { title: "User Guide", href: "/docs/user-guide", icon: Users },
+          { title: "Development Guide", href: "/docs/development", icon: Wrench },
+          { title: "Examples & Tutorials", href: "/docs/examples", icon: Layers },
+        ],
+      },
+      {
+        title: "Reference",
+        items: [
+          { title: "API Reference", href: "/docs/api-reference", icon: Code },
+          { title: "Platform Architecture", href: "/docs/architecture", icon: Database },
+        ],
+      },
+    ]
+  }
+}
 
 // Mock markdown content - in a real app, this would be loaded from your actual .md files
 const markdownContent = {
@@ -350,11 +395,17 @@ Learn about our database design and optimization strategies.`,
 
 export function Sidebar() {
   const pathname = usePathname()
-  const [expandedSections, setExpandedSections] = useState<string[]>(["Getting Started", "Guides", "Reference"])
+  const [expandedSections, setExpandedSections] = useState<string[]>(["Documentation"])
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [navigation, setNavigation] = useState<any[]>([])
+
+  // Load navigation on component mount
+  useEffect(() => {
+    generateNavigation().then(setNavigation)
+  }, [])
 
   const toggleSection = (title: string) => {
     setExpandedSections((prev) => (prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title]))
