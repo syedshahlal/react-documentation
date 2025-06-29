@@ -220,19 +220,25 @@ export function Sidebar() {
       // File item
       const isActive = pathname === item.href
       // Construct proper href for markdown files based on folder structure
-      const constructHref = (title: string, href?: string) => {
-        if (href) return href
-        // Convert folder/file structure to URL path
-        const cleanTitle = title.replace(/^\d+_\s*/, "") // Remove numerical prefix
-        const urlPath = cleanTitle
-          .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-_]/g, "")
-          .replace(/\.md$/, "") // Remove .md extension if present
-        return `/docs/${encodeURIComponent(title)}/${urlPath}`
+      const constructHref = (item: NavItem) => {
+        if (item.href) return item.href
+
+        // For files, construct the path based on the actual file structure
+        // The item.title should contain the full path like "01_GRA_Core_Platform Introduction/introduction.md"
+        if (item.title.includes("/")) {
+          // Split folder and file
+          const parts = item.title.split("/")
+          const folderName = parts[0] // e.g., "01_GRA_Core_Platform Introduction"
+          const fileName = parts[1].replace(".md", "") // e.g., "introduction"
+          return `/docs/${encodeURIComponent(folderName)}/${encodeURIComponent(fileName)}`
+        } else {
+          // Single file in root
+          const fileName = item.title.replace(".md", "")
+          return `/docs/${encodeURIComponent(fileName)}`
+        }
       }
 
-      const finalHref = constructHref(item.title, item.href)
+      const finalHref = constructHref(item)
 
       return (
         <Link key={item.title} href={finalHref}>
@@ -312,10 +318,17 @@ export function Sidebar() {
                 // Construct proper href for markdown files
                 const href =
                   result.href ||
-                  `/docs/${result.title
-                    .toLowerCase()
-                    .replace(/\s+/g, "-")
-                    .replace(/[^a-z0-9-_]/g, "")}`
+                  (() => {
+                    if (result.title.includes("/")) {
+                      const parts = result.title.split("/")
+                      const folderName = parts[0]
+                      const fileName = parts[1].replace(".md", "")
+                      return `/docs/${encodeURIComponent(folderName)}/${encodeURIComponent(fileName)}`
+                    } else {
+                      const fileName = result.title.replace(".md", "")
+                      return `/docs/${encodeURIComponent(fileName)}`
+                    }
+                  })()
                 return (
                   <Link key={index} href={href}>
                     <div
