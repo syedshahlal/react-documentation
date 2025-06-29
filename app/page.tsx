@@ -60,11 +60,11 @@ const seeAlsoLinks = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Announcement Bar - Shows only on homepage and hides on scroll */}
+      {/* Announcement Bar - Always visible at the top */}
       <Banner />
 
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b bg-white/95 backdrop-blur-sm">
+      {/* Header - Fixed below the banner */}
+      <header className="fixed top-12 left-0 right-0 z-50 border-b bg-white/95 backdrop-blur-sm">
         <div className="flex items-center justify-between px-6 py-3">
           <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 flex items-center justify-center">
@@ -104,8 +104,8 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-12 pt-20">
+      {/* Main Content - Adjusted padding for banner + header */}
+      <main className="container mx-auto px-4 py-12 pt-32">
         {/* Hero Section */}
         <div className="text-center mb-16">
           <h1 className="text-5xl font-bold text-slate-900 mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
