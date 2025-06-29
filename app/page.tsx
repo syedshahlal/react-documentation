@@ -309,7 +309,7 @@ export default function HomePage() {
       <footer className="border-t border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm mt-20">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center text-slate-600 dark:text-slate-400">
-            <p>&copy; 2025 GRA Core Platform. Built with Next.js&nbsp;and&nbsp;MDX.</p>
+            <p>{"© 2025 GRA Core Platform. Built with Next.js and MDX."}</p>
           </div>
         </div>
       </footer>
