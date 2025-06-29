@@ -96,6 +96,41 @@ export function Sidebar() {
     fetchNavigation()
   }, [])
 
+  // Add this function before the SidebarContent component
+  const getNavigationOrder = (items: NavItem[]): Array<{ slug: string; title: string; href: string }> => {
+    const order: Array<{ slug: string; title: string; href: string }> = []
+
+    const traverse = (navItems: NavItem[], parentPath = "") => {
+      navItems.forEach((item) => {
+        if (item.type === "file" && item.href) {
+          const slug = item.href.replace("/docs/", "")
+          order.push({
+            slug,
+            title: cleanDisplayName(item.title),
+            href: item.href,
+          })
+        }
+        if (item.type === "folder" && item.items) {
+          traverse(item.items, parentPath + "/" + item.title)
+        }
+      })
+    }
+
+    traverse(items)
+    return order
+  }
+
+  // Add this useEffect after the existing fetchNavigation useEffect
+  useEffect(() => {
+    if (navigation.length > 0) {
+      // Store navigation order globally for page navigation
+      const navOrder = getNavigationOrder(navigation)
+      if (typeof window !== "undefined") {
+        ;(window as any).docNavigationOrder = navOrder
+      }
+    }
+  }, [navigation])
+
   // Extract all folder names for auto-expansion
   const extractFolderNames = (items: NavItem[]): string[] => {
     const folderNames: string[] = []
@@ -419,9 +454,16 @@ export function Sidebar() {
           ) : (
             // Default Navigation
             <div className="space-y-1">
-              {navigation.map((item, index) => (
-                <NavigationItem key={`${item.title}-${index}`} item={item} />
-              ))}
+              {navigation
+                .sort((a, b) => {
+                  // Sort folders first, then files, both by their original names (with numbers)
+                  if (a.type === "folder" && b.type === "file") return -1
+                  if (a.type === "file" && b.type === "folder") return 1
+                  return a.title.localeCompare(b.title, undefined, { numeric: true })
+                })
+                .map((item, index) => (
+                  <NavigationItem key={`${item.title}-${index}`} item={item} />
+                ))}
             </div>
           )}
         </div>
