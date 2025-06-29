@@ -219,9 +219,23 @@ export function Sidebar() {
     } else {
       // File item
       const isActive = pathname === item.href
+      // Construct proper href for markdown files based on folder structure
+      const constructHref = (title: string, href?: string) => {
+        if (href) return href
+        // Convert folder/file structure to URL path
+        const cleanTitle = title.replace(/^\d+_\s*/, "") // Remove numerical prefix
+        const urlPath = cleanTitle
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-_]/g, "")
+          .replace(/\.md$/, "") // Remove .md extension if present
+        return `/docs/${encodeURIComponent(title)}/${urlPath}`
+      }
+
+      const finalHref = constructHref(item.title, item.href)
 
       return (
-        <Link key={item.href} href={item.href || "#"}>
+        <Link key={item.title} href={finalHref}>
           <Button
             variant="ghost"
             className={cn(
@@ -295,8 +309,15 @@ export function Sidebar() {
               {searchResults.map((result, index) => {
                 const IconComponent = iconMap[result.icon as keyof typeof iconMap] || Search
                 const displayName = cleanDisplayName(result.title)
+                // Construct proper href for markdown files
+                const href =
+                  result.href ||
+                  `/docs/${result.title
+                    .toLowerCase()
+                    .replace(/\s+/g, "-")
+                    .replace(/[^a-z0-9-_]/g, "")}`
                 return (
-                  <Link key={index} href={result.href || "#"}>
+                  <Link key={index} href={href}>
                     <div
                       className="block p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors cursor-pointer"
                       onClick={() => {
