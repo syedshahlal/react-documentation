@@ -71,8 +71,8 @@ function ThemeToggleButton() {
   if (!mounted) {
     return (
       <button className="flex items-center space-x-2 bg-slate-200 hover:bg-slate-300 rounded-full px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors">
-        <span className="w-4 h-4">🌙</span>
-        <span>Dark</span>
+        <span className="w-4 h-4">☀️</span>
+        <span>Light</span>
       </button>
     )
   }
@@ -84,8 +84,8 @@ function ThemeToggleButton() {
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className="flex items-center space-x-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-full px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors"
     >
-      <span className="w-4 h-4">{isDark ? "☀️" : "🌙"}</span>
-      <span>{isDark ? "Light" : "Dark"}</span>
+      <span className="w-4 h-4">{isDark ? "🌙" : "☀️"}</span>
+      <span>{isDark ? "Dark" : "Light"}</span>
     </button>
   )
 }
