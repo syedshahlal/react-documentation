@@ -21,6 +21,7 @@ function getIconForItem(name: string, isFolder: boolean): string {
   if (lowerName.includes("architecture") || lowerName.includes("system")) return "Database"
   if (lowerName.includes("example") || lowerName.includes("demo")) return "Layers"
   if (lowerName.includes("install") || lowerName.includes("setup")) return "Wrench"
+  if (lowerName.includes("local") || lowerName.includes("development")) return "Wrench"
 
   return "FileText"
 }
@@ -30,6 +31,7 @@ function fileNameToTitle(fileName: string): string {
   return fileName
     .replace(/\.md$/, "")
     .replace(/[-_]/g, " ")
+    .replace(/^\d+_/, "") // Remove leading numbers and underscore
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ")
@@ -64,10 +66,11 @@ async function readDocsStructure(dirPath: string, basePath = "/docs"): Promise<N
       const relativePath = path.relative(path.join(process.cwd(), "docs"), itemPath)
 
       if (item.isDirectory()) {
-        // Handle folders
+        // Handle folders - always include them even if empty
         const subItems = await readDocsStructure(itemPath, basePath)
         const folderTitle = fileNameToTitle(item.name)
 
+        // Include folder even if it has no markdown files (it might have subfolders)
         navItems.push({
           title: folderTitle,
           type: "folder",
@@ -94,7 +97,7 @@ async function readDocsStructure(dirPath: string, basePath = "/docs"): Promise<N
 
     return navItems
   } catch (error) {
-    console.error("Error reading docs structure:", error)
+    console.error(`Error reading docs structure for ${dirPath}:`, error)
     return []
   }
 }
@@ -108,10 +111,14 @@ export async function GET() {
       await fs.access(docsPath)
     } catch {
       // If docs directory doesn't exist, return empty structure
+      console.log("Docs directory not found")
       return NextResponse.json([])
     }
 
+    console.log("Reading docs structure from:", docsPath)
     const structure = await readDocsStructure(docsPath)
+    console.log("Generated structure:", JSON.stringify(structure, null, 2))
+
     return NextResponse.json(structure)
   } catch (error) {
     console.error("Error generating docs structure:", error)
