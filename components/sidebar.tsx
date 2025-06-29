@@ -205,7 +205,7 @@ export function Sidebar() {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="fixed top-16 left-0 w-80 p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 z-30">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -227,7 +227,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation / Search Results */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 pt-20">
         <div className="p-4 space-y-2">
           {isLoading ? (
             // Loading state
