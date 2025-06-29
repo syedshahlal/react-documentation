@@ -71,15 +71,42 @@ function ThemeToggleButton() {
   if (!mounted) {
     return (
       <div className="relative inline-flex h-8 w-16 items-center rounded-full bg-orange-500 transition-colors">
-        <div className="absolute left-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform">
+        <div className="absolute right-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition-transform">
           <svg className="h-3 w-3 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z" />
+            <circle cx="12" cy="12" r="3" />
           </svg>
         </div>
         <div className="absolute left-2 flex items-center justify-center">
-          <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z" />
-          </svg>
+          <div className="relative">
+            <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            {/* Sun rays */}
+            <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2">
+              <div className="w-0.5 h-2 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -bottom-1.5 left-1/2 transform -translate-x-1/2">
+              <div className="w-0.5 h-2 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -left-1.5 top-1/2 transform -translate-y-1/2">
+              <div className="w-2 h-0.5 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -right-1.5 top-1/2 transform -translate-y-1/2">
+              <div className="w-2 h-0.5 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -top-1 -left-1 transform rotate-45">
+              <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -top-1 -right-1 transform -rotate-45">
+              <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -bottom-1 -left-1 transform -rotate-45">
+              <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -bottom-1 -right-1 transform rotate-45">
+              <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -112,7 +139,7 @@ function ThemeToggleButton() {
           </svg>
         ) : (
           <svg className="h-3 w-3 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z" />
+            <circle cx="12" cy="12" r="3" />
           </svg>
         )}
       </div>
@@ -148,36 +175,36 @@ function ThemeToggleButton() {
           </div>
         </div>
       ) : (
-        // Light mode: Sun with rays on the right
-        <div className="absolute right-2 flex items-center justify-center">
+        // Light mode: Sun with rays on the left
+        <div className="absolute left-2 flex items-center justify-center">
           <div className="relative">
-            <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 7a5 5 0 100 10 5 5 0 000-10z" />
+            <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3" />
             </svg>
             {/* Sun rays */}
-            <div className="absolute -top-1 left-1/2 transform -translate-x-1/2">
+            <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2">
+              <div className="w-0.5 h-2 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -bottom-1.5 left-1/2 transform -translate-x-1/2">
+              <div className="w-0.5 h-2 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -left-1.5 top-1/2 transform -translate-y-1/2">
+              <div className="w-2 h-0.5 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -right-1.5 top-1/2 transform -translate-y-1/2">
+              <div className="w-2 h-0.5 bg-white rounded-full"></div>
+            </div>
+            <div className="absolute -top-1 -left-1 transform rotate-45">
               <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
             </div>
-            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
+            <div className="absolute -top-1 -right-1 transform -rotate-45">
               <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
             </div>
-            <div className="absolute -left-1 top-1/2 transform -translate-y-1/2">
-              <div className="w-1.5 h-0.5 bg-white rounded-full"></div>
+            <div className="absolute -bottom-1 -left-1 transform -rotate-45">
+              <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
             </div>
-            <div className="absolute -right-1 top-1/2 transform -translate-y-1/2">
-              <div className="w-1.5 h-0.5 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute -top-0.5 -left-0.5 transform rotate-45">
-              <div className="w-0.5 h-1 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute -top-0.5 -right-0.5 transform -rotate-45">
-              <div className="w-0.5 h-1 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute -bottom-0.5 -left-0.5 transform -rotate-45">
-              <div className="w-0.5 h-1 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 transform rotate-45">
-              <div className="w-0.5 h-1 bg-white rounded-full"></div>
+            <div className="absolute -bottom-1 -right-1 transform rotate-45">
+              <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
             </div>
           </div>
         </div>
