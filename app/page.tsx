@@ -78,7 +78,9 @@ export default function HomePage() {
 
           {/* Center Navigation Tabs */}
           <div className="flex items-center space-x-8">
-            <button className="text-sm font-medium text-blue-600 border-b-2 border-blue-600 pb-1">Home</button>
+            <Link href="/" className="text-sm font-medium text-blue-600 border-b-2 border-blue-600 pb-1">
+              About
+            </Link>
             <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">User Guide</button>
             <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Example</button>
             <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Create Doc</button>
