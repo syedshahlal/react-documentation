@@ -5,6 +5,9 @@ import { Breadcrumb } from "@/components/breadcrumb"
 import { PageNavigation } from "@/components/page-navigation"
 import { TableOfContents } from "@/components/table-of-contents"
 import { Header } from "@/components/header"
+import { promises as fs } from "fs"
+import path from "path"
+import matter from "gray-matter"
 
 // Navigation structure for determining next/previous pages
 const navigationOrder = [
@@ -16,15 +19,35 @@ const navigationOrder = [
   { slug: "architecture", title: "Platform Architecture" },
 ]
 
-// This would typically come from your markdown files
+// Tries to load a real Markdown file from the docs folder.
+// Falls back to the previous mockContent object if the file is not found.
 const getDocContent = async (slug: string[]) => {
-  const slugPath = slug.join("/")
+  // Path to the markdown file (e.g. docs/06_GCP Feature InDepth/cloud-functions.md)
+  const filePath = path.join(process.cwd(), "docs", ...slug) + ".md"
 
-  // Mock content - in a real app, you'd read from markdown files
-  const mockContent = {
-    introduction: {
-      title: "Introduction to GRA Core Platform",
-      content: `# Introduction to GRA Core Platform
+  try {
+    const fileContent = await fs.readFile(filePath, "utf-8")
+    const { data, content } = matter(fileContent)
+
+    // Derive title: front-matter > first heading > slug
+    const headingMatch = content.match(/^#\s+(.+)$/m)
+    const derivedTitle =
+      data.title || (headingMatch ? headingMatch[1].trim() : slug[slug.length - 1].replace(/-/g, " "))
+
+    return {
+      title: derivedTitle,
+      content,
+      lastUpdated: data.lastUpdated || "",
+    }
+  } catch {
+    // ---------- Fallback to previous mock data ----------
+    const slugPath = slug.join("/")
+    // (mockContent object remains unchanged below)
+    // -----------------------------------------------------
+    const mockContent = {
+      introduction: {
+        title: "Introduction to GRA Core Platform",
+        content: `# Introduction to GRA Core Platform
 
 Welcome to the GRA Core Platform documentation. This comprehensive guide will help you understand and implement our enterprise-grade platform.
 
@@ -60,11 +83,11 @@ Auto-scaling capabilities that grow with your business needs.
 ## Next Steps
 
 Ready to dive deeper? Check out our [User Guide](/docs/user-guide) or explore our [API Reference](/docs/api-reference).`,
-      lastUpdated: "2024-01-15",
-    },
-    "user-guide": {
-      title: "User Guide",
-      content: `# User Guide
+        lastUpdated: "2024-01-15",
+      },
+      "user-guide": {
+        title: "User Guide",
+        content: `# User Guide
 
 This comprehensive user guide will walk you through all aspects of using GRA Core Platform.
 
@@ -115,11 +138,11 @@ Understand how to efficiently manage your data with our APIs.
 ### Monitoring & Analytics
 
 Set up monitoring and analytics for your applications.`,
-      lastUpdated: "2024-01-14",
-    },
-    "api-reference": {
-      title: "API Reference",
-      content: `# API Reference
+        lastUpdated: "2024-01-14",
+      },
+      "api-reference": {
+        title: "API Reference",
+        content: `# API Reference
 
 Complete reference for all GRA Core Platform APIs.
 
@@ -183,11 +206,11 @@ Retrieve data from the platform.
 #### POST /api/data
 
 Submit new data to the platform.`,
-      lastUpdated: "2024-01-13",
-    },
-    examples: {
-      title: "Examples & Tutorials",
-      content: `# Examples & Tutorials
+        lastUpdated: "2024-01-13",
+      },
+      examples: {
+        title: "Examples & Tutorials",
+        content: `# Examples & Tutorials
 
 Real-world examples and step-by-step tutorials for common use cases.
 
@@ -222,11 +245,11 @@ Learn how to process data in real-time with our streaming APIs.
 ### Custom Integrations
 
 Build custom integrations with third-party services.`,
-      lastUpdated: "2024-01-12",
-    },
-    development: {
-      title: "Development Guide",
-      content: `# Development Guide
+        lastUpdated: "2024-01-12",
+      },
+      development: {
+        title: "Development Guide",
+        content: `# Development Guide
 
 Development workflows, contribution guidelines, and advanced topics.
 
@@ -270,11 +293,11 @@ Learn how to create custom plugins for the platform.
 ### Performance Optimization
 
 Best practices for optimizing your GRA Core applications.`,
-      lastUpdated: "2024-01-11",
-    },
-    architecture: {
-      title: "Platform Architecture",
-      content: `# Platform Architecture
+        lastUpdated: "2024-01-11",
+      },
+      architecture: {
+        title: "Platform Architecture",
+        content: `# Platform Architecture
 
 Deep dive into GRA Core Platform architecture and infrastructure.
 
@@ -306,11 +329,12 @@ Multi-factor authentication and OAuth 2.0 support.
 ### Data Encryption
 
 All data is encrypted at rest and in transit.`,
-      lastUpdated: "2024-01-10",
-    },
-  }
+        lastUpdated: "2024-01-10",
+      },
+    }
 
-  return mockContent[slugPath] || null
+    return mockContent[slugPath] || null
+  }
 }
 
 const getPageNavigation = (currentSlug: string) => {
@@ -383,6 +407,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
 }
 
 export async function generateStaticParams() {
+  // Pre-generate only the main top-level pages; everything else is rendered on demand.
   return [
     { slug: ["introduction"] },
     { slug: ["user-guide"] },
