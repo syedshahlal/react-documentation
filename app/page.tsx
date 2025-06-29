@@ -157,19 +157,21 @@ function ThemeToggleButton() {
         // Light mode: Sun with rays on the left
         <div className="absolute left-3 flex items-center justify-center">
           <div className="relative">
-            <div className="w-3 h-3 bg-white rounded-full"></div>
+            <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="4" />
+            </svg>
             {/* Sun rays */}
-            <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2">
-              <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
+            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+              <div className="w-0.5 h-2 bg-white rounded-full"></div>
             </div>
-            <div className="absolute -bottom-1.5 left-1/2 transform -translate-x-1/2">
-              <div className="w-0.5 h-1.5 bg-white rounded-full"></div>
+            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+              <div className="w-0.5 h-2 bg-white rounded-full"></div>
             </div>
-            <div className="absolute -left-1.5 top-1/2 transform -translate-y-1/2">
-              <div className="w-1.5 h-0.5 bg-white rounded-full"></div>
+            <div className="absolute -left-2 top-1/2 transform -translate-y-1/2">
+              <div className="w-2 h-0.5 bg-white rounded-full"></div>
             </div>
-            <div className="absolute -right-1.5 top-1/2 transform -translate-y-1/2">
-              <div className="w-1.5 h-0.5 bg-white rounded-full"></div>
+            <div className="absolute -right-2 top-1/2 transform -translate-y-1/2">
+              <div className="w-2 h-0.5 bg-white rounded-full"></div>
             </div>
             <div className="absolute -top-1 -left-1 transform rotate-45">
               <div className="w-0.5 h-1 bg-white rounded-full"></div>
