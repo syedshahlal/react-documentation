@@ -90,7 +90,7 @@ function ThemeToggleButton() {
   return (
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+      className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 border-slate-400 border-slate-50 border-transparent border-slate-600 border-slate-700 border-gray-50 border-slate-100 ${
         isDark ? "bg-slate-900 hover:bg-slate-800" : "bg-orange-500 hover:bg-orange-600"
       }`}
       aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
@@ -309,7 +309,7 @@ export default function HomePage() {
       <footer className="border-t border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm mt-20">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center text-slate-600 dark:text-slate-400">
-            <p>{"© 2025 GRA Core Platform. Built with Next.js and MDX."}</p>
+            <p>&copy; 2025 GRA Core Platform. Built with Next.js&nbsp;and&nbsp;MDX.</p>
           </div>
         </div>
       </footer>
