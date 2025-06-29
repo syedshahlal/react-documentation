@@ -58,30 +58,32 @@ export function TableOfContents({ content }: TableOfContentsProps) {
   if (toc.length === 0) return null
 
   return (
-    <div className="sticky top-8">
-      <div className="text-sm">
-        <h4 className="font-semibold text-slate-900 mb-4">On this page</h4>
-        <nav>
-          <ul className="space-y-2">
-            {toc.map((item) => (
-              <li key={item.id}>
-                <a
-                  href={`#${item.id}`}
-                  className={cn(
-                    "block py-1 text-slate-600 hover:text-slate-900 transition-colors",
-                    item.level === 1 && "font-medium",
-                    item.level === 2 && "pl-4",
-                    item.level === 3 && "pl-8",
-                    item.level >= 4 && "pl-12",
-                    activeId === item.id && "text-blue-600 font-medium",
-                  )}
-                >
-                  {item.title}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
+    <div className="hidden xl:block fixed right-4 top-1/2 -translate-y-1/2 w-64 max-h-[80vh] overflow-y-auto">
+      <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg p-4 shadow-lg">
+        <div className="text-sm">
+          <h4 className="font-semibold text-slate-900 mb-4">On this page</h4>
+          <nav>
+            <ul className="space-y-2">
+              {toc.map((item) => (
+                <li key={item.id}>
+                  <a
+                    href={`#${item.id}`}
+                    className={cn(
+                      "block py-1 text-slate-600 hover:text-slate-900 transition-colors",
+                      item.level === 1 && "font-medium",
+                      item.level === 2 && "pl-4",
+                      item.level === 3 && "pl-8",
+                      item.level >= 4 && "pl-12",
+                      activeId === item.id && "text-blue-600 font-medium",
+                    )}
+                  >
+                    {item.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
       </div>
     </div>
   )
