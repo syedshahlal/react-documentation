@@ -1,103 +1,92 @@
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/response"
 import { promises as fs } from "fs"
 import path from "path"
+import matter from "gray-matter"
 
-interface NavItem {
+interface DocItem {
   title: string
-  href?: string
-  icon: string
-  type: "file" | "folder"
-  items?: NavItem[]
+  href: string
+  order?: number
+  children?: DocItem[]
 }
 
-// Function to determine icon based on filename or folder name
-function getIconForItem(name: string, isFolder: boolean): string {
-  if (isFolder) return "Folder"
-
-  const lowerName = name.toLowerCase()
-  if (lowerName.includes("api") || lowerName.includes("reference")) return "Code"
-  if (lowerName.includes("guide") || lowerName.includes("tutorial")) return "Users"
-  if (lowerName.includes("introduction") || lowerName.includes("getting-started")) return "Home"
-  if (lowerName.includes("architecture") || lowerName.includes("system")) return "Database"
-  if (lowerName.includes("example") || lowerName.includes("demo")) return "Layers"
-  if (lowerName.includes("install") || lowerName.includes("setup")) return "Wrench"
-  if (lowerName.includes("local") || lowerName.includes("development")) return "Wrench"
-
-  return "FileText"
+interface DocSection {
+  title: string
+  items: DocItem[]
 }
 
-// Function to convert filename to title
-function fileNameToTitle(fileName: string): string {
-  return fileName
-    .replace(/\.md$/, "")
-    .replace(/[-_]/g, " ")
-    .replace(/^\d+_/, "") // Remove leading numbers and underscore
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
-
-// Function to extract title from markdown content
-async function extractTitleFromMarkdown(filePath: string): Promise<string> {
+async function processDirectory(dirPath: string, baseHref: string): Promise<DocItem[]> {
   try {
-    const content = await fs.readFile(filePath, "utf-8")
-    const titleMatch = content.match(/^#\s+(.+)$/m)
-    return titleMatch ? titleMatch[1].trim() : ""
-  } catch {
-    return ""
-  }
-}
+    const entries = await fs.readdir(dirPath, { withFileTypes: true })
+    const items: DocItem[] = []
 
-// Recursive function to read directory structure
-async function readDocsStructure(dirPath: string, basePath = "/docs"): Promise<NavItem[]> {
-  try {
-    const items = await fs.readdir(dirPath, { withFileTypes: true })
-    const navItems: NavItem[] = []
-
-    // Sort items: folders first, then files, both alphabetically
-    const sortedItems = items.sort((a, b) => {
+    // Sort entries: directories first, then files, both by numeric prefix or alphabetically
+    const sortedEntries = entries.sort((a, b) => {
+      // Directories come first
       if (a.isDirectory() && !b.isDirectory()) return -1
       if (!a.isDirectory() && b.isDirectory()) return 1
+
+      // Extract numeric prefix for ordering
+      const aMatch = a.name.match(/^(\d+)_/)
+      const bMatch = b.name.match(/^(\d+)_/)
+
+      if (aMatch && bMatch) {
+        return Number.parseInt(aMatch[1]) - Number.parseInt(bMatch[1])
+      } else if (aMatch) {
+        return -1
+      } else if (bMatch) {
+        return 1
+      }
+
       return a.name.localeCompare(b.name)
     })
 
-    for (const item of sortedItems) {
-      const itemPath = path.join(dirPath, item.name)
-      const relativePath = path.relative(path.join(process.cwd(), "docs"), itemPath)
+    for (const entry of sortedEntries) {
+      const fullPath = path.join(dirPath, entry.name)
 
-      if (item.isDirectory()) {
-        // Handle folders - always include them even if empty
-        const subItems = await readDocsStructure(itemPath, basePath)
-        const folderTitle = fileNameToTitle(item.name)
+      if (entry.isDirectory()) {
+        // Process subdirectory
+        const children = await processDirectory(fullPath, `${baseHref}/${entry.name}`)
 
-        // Include folder even if it has no markdown files (it might have subfolders)
-        navItems.push({
-          title: folderTitle,
-          type: "folder",
-          icon: getIconForItem(item.name, true),
-          items: subItems,
-        })
-      } else if (item.name.endsWith(".md")) {
-        // Handle markdown files
-        const slug = relativePath.replace(/\.md$/, "").replace(/\\/g, "/")
-        const href = `${basePath}/${slug}`
+        if (children.length > 0) {
+          const dirTitle = entry.name.replace(/^\d+_/, "").replace(/_/g, " ")
+          items.push({
+            title: dirTitle,
+            href: `${baseHref}/${entry.name}`,
+            children: children,
+          })
+        }
+      } else if (entry.name.endsWith(".md")) {
+        // Process markdown file
+        try {
+          const fileContent = await fs.readFile(fullPath, "utf-8")
+          const { data: frontmatter, content } = matter(fileContent)
 
-        // Try to extract title from markdown, fallback to filename
-        const markdownTitle = await extractTitleFromMarkdown(itemPath)
-        const title = markdownTitle || fileNameToTitle(item.name)
+          // Extract title from frontmatter or first heading
+          const headingMatch = content.match(/^#\s+(.+)$/m)
+          const title =
+            frontmatter.title ||
+            (headingMatch
+              ? headingMatch[1].trim()
+              : entry.name.replace(/\.md$/, "").replace(/^\d+_/, "").replace(/_/g, " "))
 
-        navItems.push({
-          title,
-          href,
-          type: "file",
-          icon: getIconForItem(item.name, false),
-        })
+          const fileName = entry.name.replace(/\.md$/, "")
+          const href = `${baseHref}/${fileName}`
+
+          items.push({
+            title: title,
+            href: href,
+            order: frontmatter.order,
+          })
+        } catch (error) {
+          console.error(`Error processing file ${fullPath}:`, error)
+        }
       }
     }
 
-    return navItems
+    return items
   } catch (error) {
-    console.error(`Error reading docs structure for ${dirPath}:`, error)
+    console.error(`Error processing directory ${dirPath}:`, error)
     return []
   }
 }
@@ -110,18 +99,52 @@ export async function GET() {
     try {
       await fs.access(docsPath)
     } catch {
-      // If docs directory doesn't exist, return empty structure
-      console.log("Docs directory not found")
-      return NextResponse.json([])
+      // Return fallback structure if docs directory doesn't exist
+      return NextResponse.json({
+        sections: [
+          {
+            title: "Getting Started",
+            items: [
+              { title: "Introduction", href: "/docs/introduction" },
+              { title: "User Guide", href: "/docs/user-guide" },
+              { title: "API Reference", href: "/docs/api-reference" },
+            ],
+          },
+        ],
+      })
     }
 
-    console.log("Reading docs structure from:", docsPath)
-    const structure = await readDocsStructure(docsPath)
-    console.log("Generated structure:", JSON.stringify(structure, null, 2))
+    const entries = await fs.readdir(docsPath, { withFileTypes: true })
+    const sections: DocSection[] = []
 
-    return NextResponse.json(structure)
+    // Sort directories by their numeric prefix
+    const sortedEntries = entries
+      .filter((entry) => entry.isDirectory())
+      .sort((a, b) => {
+        const aMatch = a.name.match(/^(\d+)_/)
+        const bMatch = b.name.match(/^(\d+)_/)
+        const aOrder = aMatch ? Number.parseInt(aMatch[1]) : 999
+        const bOrder = bMatch ? Number.parseInt(bMatch[1]) : 999
+        return aOrder - bOrder
+      })
+
+    for (const entry of sortedEntries) {
+      const sectionPath = path.join(docsPath, entry.name)
+      const sectionTitle = entry.name.replace(/^\d+_/, "").replace(/_/g, " ")
+
+      const items = await processDirectory(sectionPath, `/docs/${entry.name}`)
+
+      if (items.length > 0) {
+        sections.push({
+          title: sectionTitle,
+          items: items,
+        })
+      }
+    }
+
+    return NextResponse.json({ sections })
   } catch (error) {
     console.error("Error generating docs structure:", error)
-    return NextResponse.json({ error: "Failed to read docs structure" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to generate docs structure" }, { status: 500 })
   }
 }
