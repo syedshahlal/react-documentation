@@ -103,7 +103,7 @@ export default function HomePage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-lg overflow-hidden">
-                  <img src="public/BAC.png" alt="BAC Logo" className="w-full h-full object-cover" />
+                  <img src="/BAC.png" alt="BAC Logo" className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">GRA Core Platform</h1>
