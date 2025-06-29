@@ -39,6 +39,12 @@ const iconMap = {
   Search,
 }
 
+// Utility function to clean display names by removing numerical prefixes
+const cleanDisplayName = (name: string): string => {
+  // Remove numerical prefixes like "01_", "02_", etc.
+  return name.replace(/^\d+_\s*/, "").trim()
+}
+
 interface NavItem {
   title: string
   href?: string
@@ -178,24 +184,27 @@ export function Sidebar() {
   // Recursive component to render navigation items
   const NavigationItem = ({ item, level = 0 }: { item: NavItem; level?: number }) => {
     const IconComponent = iconMap[item.icon as keyof typeof iconMap] || FileText
+    const displayName = cleanDisplayName(item.title)
 
     if (item.type === "folder") {
       return (
         <div key={item.title} style={{ marginLeft: `${level * 12}px` }}>
           <Button
             variant="ghost"
-            className="w-full justify-between p-2 h-auto font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="w-full justify-between p-2 h-auto font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
             onClick={() => toggleSection(item.title)}
           >
-            <div className="flex items-center">
-              <IconComponent className="w-4 h-4 mr-2" />
-              {item.title}
+            <div className="flex items-center min-w-0 flex-1">
+              <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
+              <span className="truncate">{displayName}</span>
             </div>
-            {expandedSections.includes(item.title) ? (
-              <ChevronDown className="w-4 h-4" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
+            <div className="flex-shrink-0 ml-2">
+              {expandedSections.includes(item.title) ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </div>
           </Button>
 
           {expandedSections.includes(item.title) && item.items && (
@@ -216,7 +225,7 @@ export function Sidebar() {
           <Button
             variant="ghost"
             className={cn(
-              "w-full justify-start p-2 h-auto text-sm",
+              "w-full justify-start p-2 h-auto text-sm min-w-0",
               isActive
                 ? "bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600 dark:border-blue-400"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800",
@@ -224,8 +233,8 @@ export function Sidebar() {
             style={{ marginLeft: `${level * 12}px` }}
             onClick={() => setIsMobileOpen(false)}
           >
-            <IconComponent className="w-4 h-4 mr-2" />
-            {item.title}
+            <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
+            <span className="truncate">{displayName}</span>
           </Button>
         </Link>
       )
@@ -258,7 +267,7 @@ export function Sidebar() {
 
       {/* Navigation / Search Results */}
       <ScrollArea className="flex-1 px-4">
-        <div className="py-4 space-y-2">
+        <div className="py-4 space-y-2 min-w-0">
           {isLoading ? (
             // Loading state
             <div className="flex items-center justify-center py-8">
@@ -285,6 +294,7 @@ export function Sidebar() {
               </h3>
               {searchResults.map((result, index) => {
                 const IconComponent = iconMap[result.icon as keyof typeof iconMap] || Search
+                const displayName = cleanDisplayName(result.title)
                 return (
                   <Link key={index} href={result.href || "#"}>
                     <div
@@ -294,11 +304,15 @@ export function Sidebar() {
                         clearSearch()
                       }}
                     >
-                      <div className="flex items-start space-x-3">
+                      <div className="flex items-start space-x-3 min-w-0">
                         <IconComponent className="w-4 h-4 mt-0.5 text-slate-500 dark:text-slate-400 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-slate-900 dark:text-slate-100 text-sm">{result.title}</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{result.section}</div>
+                          <div className="font-medium text-slate-900 dark:text-slate-100 text-sm truncate">
+                            {displayName}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1 truncate">
+                            {result.section}
+                          </div>
                           {result.snippet && (
                             <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
                               {result.snippet}
