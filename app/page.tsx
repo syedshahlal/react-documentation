@@ -92,12 +92,12 @@ function ThemeToggleButton() {
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       {/* Announcement Bar - Shows only on homepage and hides on scroll */}
       <Banner />
 
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 left-0 right-0 z-50">
+      <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 left-0 right-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -106,19 +106,29 @@ export default function HomePage() {
                   <img src="/BAC.png" alt="BAC Logo" className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-900">GRA Core Platform</h1>
-                  <p className="text-sm text-slate-600">Documentation</p>
+                  <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">GRA Core Platform</h1>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Documentation</p>
                 </div>
               </div>
             </div>
 
             {/* Center Tabs */}
             <div className="flex items-center space-x-8">
-              <button className="text-sm font-medium text-blue-600 border-b-2 border-blue-600 pb-1">About</button>
-              <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">User Guide</button>
-              <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Example</button>
-              <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Create Doc</button>
-              <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">GCP BOW</button>
+              <button className="text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 pb-1">
+                About
+              </button>
+              <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+                User Guide
+              </button>
+              <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+                Example
+              </button>
+              <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+                Create Doc
+              </button>
+              <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+                GCP BOW
+              </button>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -142,7 +152,7 @@ export default function HomePage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-12 pt-20 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <main className="container mx-auto px-4 py-12 pt-20">
         {/* Hero Section */}
         <div className="text-center mb-16">
           <h1 className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -161,7 +171,7 @@ export default function HomePage() {
             const IconComponent = section.icon
             return (
               <Link key={index} href={section.href}>
-                <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+                <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
                   <CardHeader className="pb-4">
                     <div className="flex items-center space-x-3 mb-3">
                       <div
@@ -171,12 +181,14 @@ export default function HomePage() {
                       </div>
                       <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-1 transition-all duration-300" />
                     </div>
-                    <CardTitle className="text-xl font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                    <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {section.title}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-slate-600 leading-relaxed">{section.description}</CardDescription>
+                    <CardDescription className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {section.description}
+                    </CardDescription>
                   </CardContent>
                 </Card>
               </Link>
@@ -185,10 +197,12 @@ export default function HomePage() {
         </div>
 
         {/* Quick Start Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8 mb-16 border border-blue-100">
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl p-8 mb-16 border border-blue-100 dark:border-blue-800">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">Need help getting started?</h2>
-            <p className="text-slate-600 mb-6">Jump right into our comprehensive quick start guide</p>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">Need help getting started?</h2>
+            <p className="text-slate-600 dark:text-slate-300 mb-6">
+              Jump right into our comprehensive quick start guide
+            </p>
             <Button
               asChild
               size="lg"
@@ -203,17 +217,17 @@ export default function HomePage() {
         </div>
 
         {/* See Also Section */}
-        <div className="border-t pt-12">
-          <h2 className="text-2xl font-bold text-slate-900 mb-8">See Also</h2>
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-12">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-8">See Also</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {seeAlsoLinks.map((link, index) => (
               <Link key={index} href={link.href}>
-                <div className="group p-6 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all duration-300">
+                <div className="group p-6 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all duration-300">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {link.title}
                     </h3>
-                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all duration-300" />
+                    <ArrowRight className="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-1 transition-all duration-300" />
                   </div>
                 </div>
               </Link>
@@ -223,9 +237,9 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white/80 backdrop-blur-sm mt-20">
+      <footer className="border-t border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm mt-20">
         <div className="container mx-auto px-4 py-8">
-          <div className="text-center text-slate-600">
+          <div className="text-center text-slate-600 dark:text-slate-400">
             <p>&copy; 2024 GRA Core Platform. Built with Next.js and MDX.</p>
           </div>
         </div>
