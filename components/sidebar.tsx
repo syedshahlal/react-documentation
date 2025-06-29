@@ -257,8 +257,8 @@ export function Sidebar() {
       </div>
 
       {/* Navigation / Search Results */}
-      <ScrollArea className="flex-1 px-4">
-        <div className="py-4 space-y-2">
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-2">
           {isLoading ? (
             // Loading state
             <div className="flex items-center justify-center py-8">
