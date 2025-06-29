@@ -1,8 +1,14 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
+import { X } from "lucide-react"
 
 export function Banner() {
+  const [open, setOpen] = useState(true)
+
+  if (!open) return null
+
   return (
     <div className="bg-purple-200 text-purple-800 py-3 px-4 text-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -22,6 +28,13 @@ export function Banner() {
           >
             View in Dashboard
           </Link>
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Dismiss banner"
+            className="text-purple-600 hover:text-purple-800"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>

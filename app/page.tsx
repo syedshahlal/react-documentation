@@ -1,10 +1,13 @@
+"use client"
+
+import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Code, Layers, Wrench, Database, ArrowRight, Search, Menu, Book } from "lucide-react"
+import { Book, Users, Code, Layers, Wrench, Database, ArrowRight, Search, Menu } from "lucide-react"
 import Link from "next/link"
 import { Banner } from "@/components/banner"
-import Image from "next/image"
 
 const documentationSections = [
   {
@@ -57,57 +60,89 @@ const seeAlsoLinks = [
   { title: "Changelog", href: "/docs/changelog" },
 ]
 
+function ThemeToggleButton() {
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <button className="flex items-center space-x-2 bg-slate-200 hover:bg-slate-300 rounded-full px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors">
+        <span className="w-4 h-4">🌙</span>
+        <span>Dark</span>
+      </button>
+    )
+  }
+
+  const isDark = theme === "dark"
+
+  return (
+    <button
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="flex items-center space-x-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-full px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors"
+    >
+      <span className="w-4 h-4">{isDark ? "☀️" : "🌙"}</span>
+      <span>{isDark ? "Light" : "Dark"}</span>
+    </button>
+  )
+}
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Announcement Bar - Always visible at the top */}
+      {/* Announcement Bar - Shows only on homepage and hides on scroll */}
       <Banner />
 
-      {/* Header - Fixed below the banner */}
-      <header className="fixed top-12 left-0 right-0 z-50 border-b bg-white/95 backdrop-blur-sm">
-        <div className="flex items-center justify-between px-6 py-3">
-          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 flex items-center justify-center">
-              <Image src="/BAC.png" alt="BAC Logo" width={32} height={32} className="object-contain" />
+      {/* Header */}
+      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 left-0 right-0">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Book className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900">GRA Core Platform</h1>
+                  <p className="text-sm text-slate-600">Documentation</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900">GRA Core Platform</h1>
-              <p className="text-xs text-slate-600">Documentation</p>
+
+            {/* Center Tabs */}
+            <div className="flex items-center space-x-8">
+              <button className="text-sm font-medium text-blue-600 border-b-2 border-blue-600 pb-1">About</button>
+              <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">User Guide</button>
+              <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Example</button>
+              <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Create Doc</button>
+              <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">GCP BOW</button>
             </div>
-          </Link>
 
-          {/* Center Navigation Tabs */}
-          <div className="flex items-center space-x-8">
-            <Link href="/" className="text-sm font-medium text-blue-600 border-b-2 border-blue-600 pb-1">
-              About
-            </Link>
-            <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">User Guide</button>
-            <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Example</button>
-            <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Create Doc</button>
-            <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">GCP BOW</button>
-          </div>
+            <div className="flex items-center space-x-4">
+              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                v5.7 stable
+              </Badge>
 
-          <div className="flex items-center space-x-4">
-            <Badge variant="secondary" className="bg-purple-100 text-purple-700 text-xs">
-              v5.7 stable
-            </Badge>
-            <button className="flex items-center space-x-2 bg-slate-200 hover:bg-slate-300 rounded-full px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors">
-              <span className="text-sm">🌙</span>
-              <span>Dark</span>
-            </button>
-            <Button variant="outline" size="sm">
-              <Search className="w-4 h-4 mr-2" />
-              Search
-            </Button>
-            <Button variant="outline" size="sm" className="md:hidden bg-transparent">
-              <Menu className="w-4 h-4" />
-            </Button>
+              {/* Theme Toggle Pill Button */}
+              <ThemeToggleButton />
+
+              <Button variant="outline" size="sm">
+                <Search className="w-4 h-4 mr-2" />
+                Search
+              </Button>
+              <Button variant="outline" size="sm" className="md:hidden bg-transparent">
+                <Menu className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content - Adjusted padding for banner + header */}
-      <main className="container mx-auto px-4 py-12 pt-32">
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-12 pt-20">
         {/* Hero Section */}
         <div className="text-center mb-16">
           <h1 className="text-5xl font-bold text-slate-900 mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
