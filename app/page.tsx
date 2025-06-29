@@ -90,7 +90,7 @@ function ThemeToggleButton() {
   return (
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 border-slate-400 border-slate-50 border-transparent border-slate-600 border-slate-700 border-gray-50 border-slate-100 ${
+      className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 border border-slate-300 dark:border-slate-600 ${
         isDark ? "bg-slate-900 hover:bg-slate-800" : "bg-orange-500 hover:bg-orange-600"
       }`}
       aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
