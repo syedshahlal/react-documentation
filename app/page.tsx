@@ -46,8 +46,8 @@ const documentationSections = [
     color: "bg-cyan-500",
   },
   {
-    title: "Platform Architecture",
-    description: "Deep dive into GRA Core Platform architecture and infrastructure.",
+    title: "GCP Features Indepth",
+    description: "Deep dive into GRA Core Platform Features and Implementations.",
     icon: Database,
     href: "/docs/architecture",
     color: "bg-indigo-500",
