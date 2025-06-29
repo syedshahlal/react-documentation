@@ -19,16 +19,21 @@ export function PageNavigation({ previousPage, nextPage }: PageNavigationProps) 
   if (!previousPage && !nextPage) return null
 
   return (
-    <div className="flex items-center justify-between pt-8 mt-8 border-t border-slate-200">
+    <div className="flex items-center justify-between pt-8 mt-8 border-t border-slate-200 dark:border-slate-700">
       <div className="flex-1">
         {previousPage && (
           <Link href={previousPage.href}>
-            <Button variant="ghost" className="group p-4 h-auto flex-col items-start hover:bg-slate-50">
-              <div className="flex items-center text-sm text-slate-600 mb-1 group-hover:text-slate-900">
+            <Button
+              variant="ghost"
+              className="group p-4 h-auto flex-col items-start hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <div className="flex items-center text-sm text-slate-600 dark:text-slate-400 mb-1 group-hover:text-slate-900 dark:group-hover:text-slate-100">
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Previous
               </div>
-              <div className="font-medium text-slate-900 group-hover:text-blue-600">{previousPage.title}</div>
+              <div className="font-medium text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                {previousPage.title}
+              </div>
             </Button>
           </Link>
         )}
@@ -37,12 +42,17 @@ export function PageNavigation({ previousPage, nextPage }: PageNavigationProps) 
       <div className="flex-1 flex justify-end">
         {nextPage && (
           <Link href={nextPage.href}>
-            <Button variant="ghost" className="group p-4 h-auto flex-col items-end hover:bg-slate-50">
-              <div className="flex items-center text-sm text-slate-600 mb-1 group-hover:text-slate-900">
+            <Button
+              variant="ghost"
+              className="group p-4 h-auto flex-col items-end hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <div className="flex items-center text-sm text-slate-600 dark:text-slate-400 mb-1 group-hover:text-slate-900 dark:group-hover:text-slate-100">
                 Next
                 <ChevronRight className="w-4 h-4 ml-1" />
               </div>
-              <div className="font-medium text-slate-900 group-hover:text-blue-600">{nextPage.title}</div>
+              <div className="font-medium text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                {nextPage.title}
+              </div>
             </Button>
           </Link>
         )}

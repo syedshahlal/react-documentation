@@ -59,7 +59,7 @@ export function TableOfContents({ content }: TableOfContentsProps) {
 
   return (
     <div>
-      <h4 className="font-semibold text-slate-900 mb-4">On this page</h4>
+      <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-4">On this page</h4>
       <nav>
         <ul className="space-y-2">
           {toc.map((item) => (
@@ -67,12 +67,12 @@ export function TableOfContents({ content }: TableOfContentsProps) {
               <a
                 href={`#${item.id}`}
                 className={cn(
-                  "block py-1 text-sm text-slate-600 hover:text-slate-900 transition-colors",
+                  "block py-1 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors",
                   item.level === 1 && "font-medium",
                   item.level === 2 && "pl-4",
                   item.level === 3 && "pl-8",
                   item.level >= 4 && "pl-12",
-                  activeId === item.id && "text-blue-600 font-medium",
+                  activeId === item.id && "text-blue-600 dark:text-blue-400 font-medium",
                 )}
               >
                 {item.title}

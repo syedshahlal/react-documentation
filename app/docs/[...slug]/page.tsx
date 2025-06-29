@@ -351,38 +351,55 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
   const { previousPage, nextPage } = getPageNavigation(currentSlug)
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-slate-900">
       {/* Fixed Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b bg-white/95 backdrop-blur-sm">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
         <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
               <Book className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">GRA Core Platform</h1>
-              <p className="text-xs text-slate-600">Documentation</p>
+              <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">GRA Core Platform</h1>
+              <p className="text-xs text-slate-600 dark:text-slate-400">Documentation</p>
             </div>
           </div>
 
           {/* Center Navigation Tabs */}
           <div className="flex items-center space-x-8">
-            <button className="text-sm font-medium text-blue-600 border-b-2 border-blue-600 pb-1">About</button>
-            <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">User Guide</button>
-            <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Example</button>
-            <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">Create Doc</button>
-            <button className="text-sm font-medium text-slate-600 hover:text-slate-900 pb-1">GCP BOW</button>
+            <button className="text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 pb-1">
+              About
+            </button>
+            <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+              User Guide
+            </button>
+            <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+              Example
+            </button>
+            <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+              Create Doc
+            </button>
+            <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
+              GCP BOW
+            </button>
           </div>
 
           <div className="flex items-center space-x-4">
-            <Badge variant="secondary" className="bg-purple-100 text-purple-700 text-xs">
+            <Badge
+              variant="secondary"
+              className="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-xs"
+            >
               v5.7 stable
             </Badge>
-            <button className="flex items-center space-x-2 bg-slate-200 hover:bg-slate-300 rounded-full px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors">
+            <button className="flex items-center space-x-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-full px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors">
               <span className="text-sm">🌙</span>
               <span>Dark</span>
             </button>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 bg-transparent"
+            >
               <Search className="w-4 h-4 mr-2" />
               Search
             </Button>
@@ -392,7 +409,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
 
       <div className="flex pt-16">
         {/* Fixed Left Sidebar */}
-        <div className="fixed left-0 top-16 bottom-0 w-80 border-r bg-white overflow-y-auto">
+        <div className="fixed left-0 top-16 bottom-0 w-80 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-y-auto">
           <Sidebar />
         </div>
 
@@ -410,7 +427,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
         </main>
 
         {/* Fixed Right Sidebar - Table of Contents */}
-        <div className="fixed right-0 top-16 bottom-0 w-80 border-l bg-white overflow-y-auto">
+        <div className="fixed right-0 top-16 bottom-0 w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-y-auto">
           <div className="p-6">
             <TableOfContents content={doc.content} />
           </div>

@@ -16,15 +16,15 @@ export function Breadcrumb({ slug }: BreadcrumbProps) {
   ]
 
   return (
-    <nav className="flex items-center space-x-2 text-sm text-slate-600 mb-8">
+    <nav className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400 mb-8">
       {breadcrumbs.map((crumb, index) => (
         <div key={crumb.href} className="flex items-center space-x-2">
           {index === 0 && <Home className="w-4 h-4" />}
           {index > 0 && <ChevronRight className="w-4 h-4" />}
           {index === breadcrumbs.length - 1 ? (
-            <span className="text-slate-900 font-medium">{crumb.title}</span>
+            <span className="text-slate-900 dark:text-slate-100 font-medium">{crumb.title}</span>
           ) : (
-            <Link href={crumb.href} className="hover:text-slate-900 transition-colors">
+            <Link href={crumb.href} className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
               {crumb.title}
             </Link>
           )}
