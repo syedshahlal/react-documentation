@@ -99,6 +99,44 @@ class OptimizedDataAccess {
     return result
   }
 }
+
+// Inefficient query - N+1 problem
+async function getBadUserPosts() {
+  const users = await User.query();
+  
+  for (const user of users) {
+    user.posts = await Post.query().where('user_id', user.id);
+  }
+  
+  return users;
+}
+
+// Optimized query with eager loading
+async function getOptimizedUserPosts() {
+  return await User.query()
+    .withRelated('posts')
+    .orderBy('created_at', 'desc');
+}
+
+// Complex query optimization
+async function getPostsWithStats() {
+  return await db.raw(`
+    SELECT 
+      p.*,
+      u.first_name,
+      u.last_name,
+      COUNT(c.id) as comment_count,
+      COUNT(l.id) as like_count
+    FROM posts p
+    LEFT JOIN users u ON p.user_id = u.id
+    LEFT JOIN comments c ON p.id = c.post_id
+    LEFT JOIN likes l ON p.id = l.post_id
+    WHERE p.status = 'published'
+    GROUP BY p.id, u.id
+    ORDER BY p.created_at DESC
+    LIMIT 20
+  `);
+}
 \`\`\`
 
 ### Indexing Strategy
@@ -133,6 +171,35 @@ const createIndexes = async () => {
     }
   )
 }
+
+// Primary indexes for frequently queried columns
+CREATE INDEX CONCURRENTLY idx_posts_user_id ON posts(user_id);
+CREATE INDEX CONCURRENTLY idx_posts_status ON posts(status);
+CREATE INDEX CONCURRENTLY idx_posts_created_at ON posts(created_at);
+
+// Composite indexes for complex queries
+CREATE INDEX CONCURRENTLY idx_posts_status_created_at ON posts(status, created_at);
+CREATE INDEX CONCURRENTLY idx_posts_user_status ON posts(user_id, status);
+
+// Partial indexes for specific conditions
+CREATE INDEX CONCURRENTLY idx_posts_published 
+ON posts(created_at) 
+WHERE status = 'published';
+
+// Full-text search indexes
+CREATE INDEX CONCURRENTLY idx_posts_search 
+ON posts USING gin(to_tsvector('english', title || ' ' || content));
+
+// Monitor index usage
+SELECT 
+  schemaname,
+  tablename,
+  indexname,
+  idx_scan,
+  idx_tup_read,
+  idx_tup_fetch
+FROM pg_stat_user_indexes
+ORDER BY idx_scan DESC;
 \`\`\`
 
 ## Caching Strategies

@@ -1,15 +1,22 @@
 # User Authentication Tutorial
 
-Learn how to implement secure user authentication in your GRA Core Platform application.
+Learn how to implement secure user authentication in your GRA Core Platform application using built-in authentication services.
 
 ## Overview
+Learn how to implement secure user authentication in your GRA Core Platform application.
 
-This tutorial covers:
-- Setting up authentication
-- User registration and login
-- Token management
-- Protected routes
-- Session handling
+## Prerequisites
+- Completed [Basic Setup Tutorial](./basic-setup.md)
+- Understanding of JavaScript/TypeScript
+- Familiarity with REST APIs
+
+## Authentication Methods
+
+GRA Core Platform supports multiple authentication methods:
+- Email/Password
+- OAuth (Google, GitHub, Microsoft)
+- JWT Tokens
+- Multi-Factor Authentication (MFA)
 
 ## Authentication Setup
 
@@ -21,14 +28,27 @@ npm install @gra-core/auth
 
 ### 2. Configure Authentication
 
+#### Enable Authentication in Config
 \`\`\`javascript
-import { GRAAuth } from '@gra-core/auth'
+// gra.config.js
+module.exports = {
+  features: {
+    authentication: {
+      enabled: true,
+      providers: ['email', 'google', 'github'],
+      mfa: true,
+      sessionTimeout: 3600 // 1 hour
+    }
+  }
+}
+\`\`\`
 
-const auth = new GRAAuth({
-  apiKey: process.env.GRA_API_KEY,
-  redirectUri: 'http://localhost:3000/callback',
-  scopes: ['read', 'write', 'admin']
-})
+#### Environment Variables
+\`\`\`env
+# Add to .env
+GRA_AUTH_SECRET=your_secret_key_here
+GRA_OAUTH_GOOGLE_CLIENT_ID=your_google_client_id
+GRA_OAUTH_GOOGLE_CLIENT_SECRET=your_google_client_secret
 \`\`\`
 
 ## User Registration
@@ -36,20 +56,24 @@ const auth = new GRAAuth({
 ### Basic Registration
 
 \`\`\`javascript
-async function registerUser(userData) {
+import { GRAAuth } from '@gra/auth';
+
+const auth = new GRAAuth();
+
+export async function registerUser(userData) {
   try {
     const result = await auth.register({
       email: userData.email,
       password: userData.password,
-      firstName: userData.firstName,
-      lastName: userData.lastName
-    })
+      profile: {
+        firstName: userData.firstName,
+        lastName: userData.lastName
+      }
+    });
     
-    console.log('User registered:', result.user)
-    return result
+    return result;
   } catch (error) {
-    console.error('Registration failed:', error)
-    throw error
+    throw new Error(`Registration failed: ${error.message}`);
   }
 }
 \`\`\`
@@ -80,21 +104,19 @@ async function registerWithVerification(userData) {
 ### Standard Login
 
 \`\`\`javascript
-async function loginUser(credentials) {
+export async function loginUser(credentials) {
   try {
     const result = await auth.login({
       email: credentials.email,
       password: credentials.password
-    })
+    });
     
-    // Store tokens securely
-    localStorage.setItem('accessToken', result.accessToken)
-    localStorage.setItem('refreshToken', result.refreshToken)
+    // Store token securely
+    localStorage.setItem('gra_token', result.token);
     
-    return result
+    return result;
   } catch (error) {
-    console.error('Login failed:', error)
-    throw error
+    throw new Error(`Login failed: ${error.message}`);
   }
 }
 \`\`\`
@@ -102,30 +124,12 @@ async function loginUser(credentials) {
 ### OAuth Login
 
 \`\`\`javascript
-async function loginWithOAuth(provider) {
+export async function loginWithOAuth(provider) {
   try {
-    // Redirect to OAuth provider
-    const authUrl = await auth.getOAuthUrl(provider)
-    window.location.href = authUrl
+    const result = await auth.loginWithOAuth(provider);
+    return result;
   } catch (error) {
-    console.error('OAuth login failed:', error)
-    throw error
-  }
-}
-
-// Handle OAuth callback
-async function handleOAuthCallback(code) {
-  try {
-    const result = await auth.exchangeOAuthCode(code)
-    
-    // Store tokens
-    localStorage.setItem('accessToken', result.accessToken)
-    localStorage.setItem('refreshToken', result.refreshToken)
-    
-    return result
-  } catch (error) {
-    console.error('OAuth callback failed:', error)
-    throw error
+    throw new Error(`OAuth login failed: ${error.message}`);
   }
 }
 \`\`\`
@@ -202,6 +206,59 @@ app.get('/protected', requireAuth, (req, res) => {
 })
 \`\`\`
 
+### Auth Guard Hook
+\`\`\`javascript
+// src/hooks/useAuth.js
+import { useState, useEffect } from 'react';
+import { GRAAuth } from '@gra/auth';
+
+export function useAuth() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = localStorage.getItem('gra_token');
+        if (token) {
+          const userData = await GRAAuth.verifyToken(token);
+          setUser(userData);
+        }
+      } catch (error) {
+        localStorage.removeItem('gra_token');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  return { user, loading };
+}
+\`\`\`
+
+### Protected Component
+\`\`\`jsx
+// src/components/ProtectedRoute.jsx
+import React from 'react';
+import { useAuth } from '../hooks/useAuth';
+
+export function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <div>Please log in to access this page.</div>;
+  }
+
+  return children;
+}
+\`\`\`
+
 ## Session Management
 
 ### Session Storage
@@ -268,7 +325,7 @@ function handleAuthError(error) {
 ## Complete Example
 
 \`\`\`javascript
-import { GRAAuth } from '@gra-core/auth'
+import { GRAAuth } from '@gra/auth'
 
 class AuthService {
   constructor() {

@@ -1,84 +1,99 @@
-# Basic Setup Example
+# Basic Setup Tutorial
 
-This guide walks you through setting up your first GRA Core Platform project from scratch.
+## Overview
+This tutorial will guide you through the basic setup process for GRA Core Platform, covering initial configuration, environment setup, and your first project creation.
 
 ## Prerequisites
-
-Before you begin, make sure you have:
-
 - Node.js 18+ installed
-- npm or yarn package manager
-- A GRA Core Platform account
-- API credentials
+- Git installed
+- Access to GRA Core Platform account
 
-## Step 1: Create a New Project
+## Step 1: Installation
 
-First, create a new directory for your project:
-
+### Install GRA CLI
 \`\`\`bash
-mkdir my-gra-project
-cd my-gra-project
-npm init -y
+npm install -g @gra/cli
 \`\`\`
 
-## Step 2: Install Dependencies
-
-Install the GRA Core Platform SDK:
-
+### Verify Installation
 \`\`\`bash
-npm install @gra-core/platform
-npm install @gra-core/auth
-npm install @gra-core/data
+gra --version
 \`\`\`
 
-## Step 3: Basic Configuration
+## Step 2: Authentication
 
+### Login to GRA Platform
+\`\`\`bash
+gra auth login
+\`\`\`
+
+This will open your browser and prompt you to authenticate with your GRA account.
+
+### Verify Authentication
+\`\`\`bash
+gra auth whoami
+\`\`\`
+
+## Step 3: Create Your First Project
+
+### Initialize New Project
+\`\`\`bash
+gra init my-first-project
+cd my-first-project
+\`\`\`
+
+### Project Structure
+\`\`\`
+my-first-project/
+├── src/
+│   ├── components/
+│   ├── services/
+│   └── utils/
+├── config/
+├── tests/
+├── package.json
+└── gra.config.js
+\`\`\`
+
+## Step 4: Configuration
+
+### Environment Variables
 Create a `.env` file in your project root:
 
 \`\`\`env
-GRA_API_KEY=your_api_key_here
 GRA_ENVIRONMENT=development
-GRA_BASE_URL=https://api.gra-core.com
+GRA_API_KEY=your_api_key_here
+GRA_PROJECT_ID=your_project_id
 \`\`\`
 
-## Step 4: Initialize the Client
-
-Create an `index.js` file:
+### GRA Configuration
+Update `gra.config.js`:
 
 \`\`\`javascript
-import { GRACore } from '@gra-core/platform'
-
-const client = new GRACore({
-  apiKey: process.env.GRA_API_KEY,
-  environment: process.env.GRA_ENVIRONMENT
-})
-
-async function main() {
-  try {
-    // Test the connection
-    const status = await client.health.check()
-    console.log('Connection successful:', status)
-    
-    // Your application logic here
-    
-  } catch (error) {
-    console.error('Error:', error)
+module.exports = {
+  projectId: process.env.GRA_PROJECT_ID,
+  environment: process.env.GRA_ENVIRONMENT,
+  features: {
+    authentication: true,
+    monitoring: true,
+    caching: true
   }
 }
-
-main()
 \`\`\`
 
-## Step 5: Run Your Application
+## Step 5: Run Your Project
 
-Execute your application:
-
+### Development Mode
 \`\`\`bash
-node index.js
+npm run dev
+\`\`\`
+
+### Build for Production
+\`\`\`bash
+npm run build
 \`\`\`
 
 ## Next Steps
-
 - Explore the [User Authentication Tutorial](./user-authentication.md)
 - Learn about [Data Management](./data-management.md)
 - Check out the [API Reference](../03_API%20Reference/api-reference.md)
@@ -87,12 +102,17 @@ node index.js
 
 ### Common Issues
 
-**Connection Timeout**
-- Check your internet connection
-- Verify your API key is correct
-- Ensure the GRA service is running
+**Issue: Authentication Failed**
+\`\`\`bash
+# Clear auth cache and retry
+gra auth logout
+gra auth login
+\`\`\`
 
-**Authentication Failed**
-- Double-check your API credentials
-- Make sure your account is active
-- Contact support if issues persist
+**Issue: Project Creation Failed**
+- Ensure you have proper permissions
+- Check network connectivity
+- Verify GRA CLI version
+
+## Support
+For additional help, visit our [Development Guide](../05_Development%20Guide/) or contact support.

@@ -39,12 +39,6 @@ const iconMap = {
   Search,
 }
 
-// Utility function to clean display names by removing numerical prefixes
-const cleanDisplayName = (name: string): string => {
-  // Remove numerical prefixes like "01_", "02_", etc.
-  return name.replace(/^\d+_\s*/, "").trim()
-}
-
 interface NavItem {
   title: string
   href?: string
@@ -63,7 +57,6 @@ export function Sidebar() {
   const [navigation, setNavigation] = useState<NavItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isExpandedAll, setIsExpandedAll] = useState(true)
 
   // Load navigation from API
   useEffect(() => {
@@ -80,7 +73,6 @@ export function Sidebar() {
         // Auto-expand all folders by default
         const expandedFolders = extractFolderNames(data)
         setExpandedSections(expandedFolders)
-        setIsExpandedAll(true)
 
         setError(null)
       } catch (err) {
@@ -95,41 +87,6 @@ export function Sidebar() {
 
     fetchNavigation()
   }, [])
-
-  // Add this function before the SidebarContent component
-  const getNavigationOrder = (items: NavItem[]): Array<{ slug: string; title: string; href: string }> => {
-    const order: Array<{ slug: string; title: string; href: string }> = []
-
-    const traverse = (navItems: NavItem[], parentPath = "") => {
-      navItems.forEach((item) => {
-        if (item.type === "file" && item.href) {
-          const slug = item.href.replace("/docs/", "")
-          order.push({
-            slug,
-            title: cleanDisplayName(item.title),
-            href: item.href,
-          })
-        }
-        if (item.type === "folder" && item.items) {
-          traverse(item.items, parentPath + "/" + item.title)
-        }
-      })
-    }
-
-    traverse(items)
-    return order
-  }
-
-  // Add this useEffect after the existing fetchNavigation useEffect
-  useEffect(() => {
-    if (navigation.length > 0) {
-      // Store navigation order globally for page navigation
-      const navOrder = getNavigationOrder(navigation)
-      if (typeof window !== "undefined") {
-        ;(window as any).docNavigationOrder = navOrder
-      }
-    }
-  }, [navigation])
 
   // Extract all folder names for auto-expansion
   const extractFolderNames = (items: NavItem[]): string[] => {
@@ -218,43 +175,27 @@ export function Sidebar() {
     setIsSearching(false)
   }
 
-  const toggleExpandAll = () => {
-    if (isExpandedAll) {
-      // Collapse all
-      setExpandedSections([])
-      setIsExpandedAll(false)
-    } else {
-      // Expand all
-      const allFolders = extractFolderNames(navigation)
-      setExpandedSections(allFolders)
-      setIsExpandedAll(true)
-    }
-  }
-
   // Recursive component to render navigation items
   const NavigationItem = ({ item, level = 0 }: { item: NavItem; level?: number }) => {
     const IconComponent = iconMap[item.icon as keyof typeof iconMap] || FileText
-    const displayName = cleanDisplayName(item.title)
 
     if (item.type === "folder") {
       return (
         <div key={item.title} style={{ marginLeft: `${level * 12}px` }}>
           <Button
             variant="ghost"
-            className="w-full justify-between p-2 h-auto font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
+            className="w-full justify-between p-2 h-auto font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
             onClick={() => toggleSection(item.title)}
           >
-            <div className="flex items-center min-w-0 flex-1">
-              <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
-              <span className="truncate">{displayName}</span>
+            <div className="flex items-center">
+              <IconComponent className="w-4 h-4 mr-2" />
+              {item.title}
             </div>
-            <div className="flex-shrink-0 ml-2">
-              {expandedSections.includes(item.title) ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
-            </div>
+            {expandedSections.includes(item.title) ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
           </Button>
 
           {expandedSections.includes(item.title) && item.items && (
@@ -269,33 +210,13 @@ export function Sidebar() {
     } else {
       // File item
       const isActive = pathname === item.href
-      // Construct proper href for markdown files based on folder structure
-      const constructHref = (item: NavItem) => {
-        if (item.href) return item.href
-
-        // For files, construct the path based on the actual file structure
-        // The item.title should contain the full path like "01_GRA_Core_Platform Introduction/introduction.md"
-        if (item.title.includes("/")) {
-          // Split folder and file
-          const parts = item.title.split("/")
-          const folderName = parts[0] // e.g., "01_GRA_Core_Platform Introduction"
-          const fileName = parts[1].replace(".md", "") // e.g., "introduction"
-          return `/docs/${encodeURIComponent(folderName)}/${encodeURIComponent(fileName)}`
-        } else {
-          // Single file in root
-          const fileName = item.title.replace(".md", "")
-          return `/docs/${encodeURIComponent(fileName)}`
-        }
-      }
-
-      const finalHref = constructHref(item)
 
       return (
-        <Link key={item.title} href={finalHref}>
+        <Link key={item.href} href={item.href || "#"}>
           <Button
             variant="ghost"
             className={cn(
-              "w-full justify-start p-2 h-auto text-sm min-w-0",
+              "w-full justify-start p-2 h-auto text-sm",
               isActive
                 ? "bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600 dark:border-blue-400"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800",
@@ -303,8 +224,8 @@ export function Sidebar() {
             style={{ marginLeft: `${level * 12}px` }}
             onClick={() => setIsMobileOpen(false)}
           >
-            <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
-            <span className="truncate">{displayName}</span>
+            <IconComponent className="w-4 h-4 mr-2" />
+            {item.title}
           </Button>
         </Link>
       )
@@ -337,33 +258,7 @@ export function Sidebar() {
 
       {/* Navigation / Search Results */}
       <ScrollArea className="flex-1 px-4">
-        <div className="py-4 space-y-2 min-w-0">
-          {/* Expand/Collapse All Toggle */}
-          {!isSearching && navigation.length > 0 && (
-            <div className="mb-4 flex justify-center">
-              <button
-                onClick={toggleExpandAll}
-                className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full border transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-1"
-                style={{
-                  backgroundColor: isExpandedAll ? "#f1f5f9" : "#e2e8f0",
-                  borderColor: isExpandedAll ? "#cbd5e1" : "#94a3b8",
-                  color: isExpandedAll ? "#475569" : "#64748b",
-                }}
-              >
-                {isExpandedAll ? (
-                  <>
-                    <ChevronDown className="w-3 h-3 mr-1" />
-                    Collapse All
-                  </>
-                ) : (
-                  <>
-                    <ChevronRight className="w-3 h-3 mr-1" />
-                    Expand All
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+        <div className="py-4 space-y-2">
           {isLoading ? (
             // Loading state
             <div className="flex items-center justify-center py-8">
@@ -390,23 +285,8 @@ export function Sidebar() {
               </h3>
               {searchResults.map((result, index) => {
                 const IconComponent = iconMap[result.icon as keyof typeof iconMap] || Search
-                const displayName = cleanDisplayName(result.title)
-                // Construct proper href for markdown files
-                const href =
-                  result.href ||
-                  (() => {
-                    if (result.title.includes("/")) {
-                      const parts = result.title.split("/")
-                      const folderName = parts[0]
-                      const fileName = parts[1].replace(".md", "")
-                      return `/docs/${encodeURIComponent(folderName)}/${encodeURIComponent(fileName)}`
-                    } else {
-                      const fileName = result.title.replace(".md", "")
-                      return `/docs/${encodeURIComponent(fileName)}`
-                    }
-                  })()
                 return (
-                  <Link key={index} href={href}>
+                  <Link key={index} href={result.href || "#"}>
                     <div
                       className="block p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors cursor-pointer"
                       onClick={() => {
@@ -414,15 +294,11 @@ export function Sidebar() {
                         clearSearch()
                       }}
                     >
-                      <div className="flex items-start space-x-3 min-w-0">
+                      <div className="flex items-start space-x-3">
                         <IconComponent className="w-4 h-4 mt-0.5 text-slate-500 dark:text-slate-400 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-slate-900 dark:text-slate-100 text-sm truncate">
-                            {displayName}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1 truncate">
-                            {result.section}
-                          </div>
+                          <div className="font-medium text-slate-900 dark:text-slate-100 text-sm">{result.title}</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{result.section}</div>
                           {result.snippet && (
                             <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
                               {result.snippet}
@@ -454,16 +330,9 @@ export function Sidebar() {
           ) : (
             // Default Navigation
             <div className="space-y-1">
-              {navigation
-                .sort((a, b) => {
-                  // Sort folders first, then files, both by their original names (with numbers)
-                  if (a.type === "folder" && b.type === "file") return -1
-                  if (a.type === "file" && b.type === "folder") return 1
-                  return a.title.localeCompare(b.title, undefined, { numeric: true })
-                })
-                .map((item, index) => (
-                  <NavigationItem key={`${item.title}-${index}`} item={item} />
-                ))}
+              {navigation.map((item, index) => (
+                <NavigationItem key={`${item.title}-${index}`} item={item} />
+              ))}
             </div>
           )}
         </div>

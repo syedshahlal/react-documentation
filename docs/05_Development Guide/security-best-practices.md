@@ -3,586 +3,556 @@
 Comprehensive guide to securing your GRA Core Platform applications.
 
 ## Overview
-
-This guide covers essential security practices including:
-- Authentication and authorization
-- Data encryption
-- Input validation and sanitization
-- API security
-- Infrastructure security
-- Monitoring and logging
+This guide covers essential security practices for developing secure applications with GRA Core Platform, including authentication, authorization, data protection, and vulnerability prevention.
 
 ## Authentication Security
 
-### Strong Password Policies
-
+### Password Security
 \`\`\`javascript
-import bcrypt from 'bcrypt'
-import zxcvbn from 'zxcvbn'
+// Strong password requirements
+const passwordPolicy = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumbers: true,
+  requireSpecialChars: true,
+  preventCommonPasswords: true,
+  preventUserInfo: true // Don't allow name, email in password
+};
 
-class PasswordSecurity {
-  static validatePassword(password) {
-    const result = zxcvbn(password)
-    
-    const requirements = {
-      minLength: password.length >= 12,
-      hasUppercase: /[A-Z]/.test(password),
-      hasLowercase: /[a-z]/.test(password),
-      hasNumbers: /\d/.test(password),
-      hasSpecialChars: /[!@#$%^&*(),.?":{}|<>]/.test(password),
-      strongEnough: result.score >= 3
-    }
-    
-    const isValid = Object.values(requirements).every(req => req)
-    
-    return {
-      isValid,
-      requirements,
-      score: result.score,
-      feedback: result.feedback
-    }
-  }
-  
-  static async hashPassword(password) {
-    const saltRounds = 12
-    return await bcrypt.hash(password, saltRounds)
-  }
-  
-  static async verifyPassword(password, hash) {
-    return await bcrypt.compare(password, hash)
-  }
+// Password hashing with bcrypt
+import bcrypt from 'bcrypt';
+
+export async function hashPassword(password) {
+  const saltRounds = 12; // Increase for higher security
+  return await bcrypt.hash(password, saltRounds);
+}
+
+export async function verifyPassword(password, hash) {
+  return await bcrypt.compare(password, hash);
 }
 \`\`\`
 
-### Multi-Factor Authentication (MFA)
-
+### JWT Token Security
 \`\`\`javascript
-import speakeasy from 'speakeasy'
-import QRCode from 'qrcode'
+// Secure JWT configuration
+const jwtConfig = {
+  accessTokenExpiry: '15m', // Short-lived access tokens
+  refreshTokenExpiry: '7d',  // Longer-lived refresh tokens
+  algorithm: 'RS256',        // Use asymmetric encryption
+  issuer: 'gra-platform',
+  audience: 'gra-app'
+};
 
-class MFAService {
+// Token generation with proper claims
+export function generateTokens(user) {
+  const payload = {
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+    iat: Math.floor(Date.now() / 1000),
+    iss: jwtConfig.issuer,
+    aud: jwtConfig.audience
+  };
+
+  const accessToken = jwt.sign(payload, privateKey, {
+    expiresIn: jwtConfig.accessTokenExpiry,
+    algorithm: jwtConfig.algorithm
+  });
+
+  const refreshToken = jwt.sign(
+    { sub: user.id, type: 'refresh' },
+    refreshPrivateKey,
+    { expiresIn: jwtConfig.refreshTokenExpiry }
+  );
+
+  return { accessToken, refreshToken };
+}
+\`\`\`
+
+### Multi-Factor Authentication
+\`\`\`javascript
+// TOTP-based MFA implementation
+import speakeasy from 'speakeasy';
+import qrcode from 'qrcode';
+
+export class MFAService {
   static generateSecret(userEmail) {
-    const secret = speakeasy.generateSecret({
-      name: `GRA Core Platform (${userEmail})`,
+    return speakeasy.generateSecret({
+      name: `GRA Platform (${userEmail})`,
       issuer: 'GRA Core Platform',
       length: 32
-    })
-    
-    return {
+    });
+  }
+
+  static async generateQRCode(secret) {
+    const otpauthUrl = speakeasy.otpauthURL({
       secret: secret.base32,
-      qrCode: secret.otpauth_url
-    }
+      label: secret.name,
+      issuer: secret.issuer,
+      encoding: 'base32'
+    });
+
+    return await qrcode.toDataURL(otpauthUrl);
   }
-  
-  static async generateQRCode(otpauth_url) {
-    try {
-      const qrCodeDataURL = await QRCode.toDataURL(otpauth_url)
-      return qrCodeDataURL
-    } catch (error) {
-      throw new Error('Failed to generate QR code')
-    }
-  }
-  
-  static verifyToken(token, secret) {
+
+  static verifyToken(secret, token) {
     return speakeasy.totp.verify({
-      secret,
+      secret: secret,
       encoding: 'base32',
-      token,
-      window: 2 // Allow 2 time steps (60 seconds) of variance
-    })
+      token: token,
+      window: 2 // Allow 2 time steps (60 seconds) tolerance
+    });
   }
 }
 \`\`\`
 
-### JWT Security
+## Authorization & Access Control
 
+### Role-Based Access Control (RBAC)
 \`\`\`javascript
-import jwt from 'jsonwebtoken'
-import crypto from 'crypto'
+// Define roles and permissions
+const roles = {
+  admin: {
+    permissions: ['*'] // All permissions
+  },
+  moderator: {
+    permissions: [
+      'posts:read',
+      'posts:update',
+      'posts:delete',
+      'users:read',
+      'comments:moderate'
+    ]
+  },
+  user: {
+    permissions: [
+      'posts:read',
+      'posts:create',
+      'posts:update:own',
+      'comments:create',
+      'profile:update:own'
+    ]
+  }
+};
 
-class JWTSecurity {
-  constructor() {
-    this.accessTokenSecret = process.env.JWT_ACCESS_SECRET
-    this.refreshTokenSecret = process.env.JWT_REFRESH_SECRET
-    this.accessTokenExpiry = '15m'
-    this.refreshTokenExpiry = '7d'
-  }
-  
-  generateTokenPair(payload) {
-    const jti = crypto.randomUUID() // Unique token ID
+// Permission checking middleware
+export function requirePermission(permission) {
+  return (req, res, next) => {
+    const user = req.user;
     
-    const accessToken = jwt.sign(
-      { ...payload, jti, type: 'access' },
-      this.accessTokenSecret,
-      { 
-        expiresIn: this.accessTokenExpiry,
-        issuer: 'gra-core-platform',
-        audience: 'gra-core-api'
-      }
-    )
-    
-    const refreshToken = jwt.sign(
-      { userId: payload.userId, jti, type: 'refresh' },
-      this.refreshTokenSecret,
-      { 
-        expiresIn: this.refreshTokenExpiry,
-        issuer: 'gra-core-platform',
-        audience: 'gra-core-api'
-      }
-    )
-    
-    return { accessToken, refreshToken, jti }
-  }
-  
-  verifyAccessToken(token) {
-    try {
-      return jwt.verify(token, this.accessTokenSecret, {
-        issuer: 'gra-core-platform',
-        audience: 'gra-core-api'
-      })
-    } catch (error) {
-      throw new Error('Invalid access token')
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
-  }
-  
-  verifyRefreshToken(token) {
-    try {
-      return jwt.verify(token, this.refreshTokenSecret, {
-        issuer: 'gra-core-platform',
-        audience: 'gra-core-api'
-      })
-    } catch (error) {
-      throw new Error('Invalid refresh token')
+
+    const userRole = roles[user.role];
+    
+    if (!userRole) {
+      return res.status(403).json({ error: 'Invalid role' });
     }
-  }
+
+    // Check for wildcard permission
+    if (userRole.permissions.includes('*')) {
+      return next();
+    }
+
+    // Check specific permission
+    if (userRole.permissions.includes(permission)) {
+      return next();
+    }
+
+    // Check ownership-based permissions
+    if (permission.endsWith(':own')) {
+      const basePermission = permission.replace(':own', '');
+      if (userRole.permissions.includes(`${basePermission}:own`)) {
+        // Additional ownership check will be done in the route handler
+        req.requireOwnership = true;
+        return next();
+      }
+    }
+
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  };
 }
 \`\`\`
 
-## Data Encryption
-
-### Encryption at Rest
-
+### Resource-Level Authorization
 \`\`\`javascript
-import crypto from 'crypto'
+// Ownership verification
+export async function verifyOwnership(resourceType, resourceId, userId) {
+  const queries = {
+    post: 'SELECT user_id FROM posts WHERE id = ?',
+    comment: 'SELECT user_id FROM comments WHERE id = ?',
+    profile: 'SELECT id FROM users WHERE id = ?'
+  };
 
-class DataEncryption {
-  constructor() {
-    this.algorithm = 'aes-256-gcm'
-    this.keyLength = 32
-    this.ivLength = 16
-    this.tagLength = 16
-    this.masterKey = Buffer.from(process.env.MASTER_KEY, 'hex')
+  const query = queries[resourceType];
+  if (!query) {
+    throw new Error('Invalid resource type');
   }
-  
-  encrypt(plaintext) {
-    try {
-      const iv = crypto.randomBytes(this.ivLength)
-      const cipher = crypto.createCipher(this.algorithm, this.masterKey, iv)
-      
-      let encrypted = cipher.update(plaintext, 'utf8', 'hex')
-      encrypted += cipher.final('hex')
-      
-      const tag = cipher.getAuthTag()
-      
-      return {
-        encrypted,
-        iv: iv.toString('hex'),
-        tag: tag.toString('hex')
-      }
-    } catch (error) {
-      throw new Error('Encryption failed')
-    }
-  }
-  
-  decrypt(encryptedData) {
-    try {
-      const { encrypted, iv, tag } = encryptedData
-      const decipher = crypto.createDecipher(
-        this.algorithm,
-        this.masterKey,
-        Buffer.from(iv, 'hex')
-      )
-      
-      decipher.setAuthTag(Buffer.from(tag, 'hex'))
-      
-      let decrypted = decipher.update(encrypted, 'hex', 'utf8')
-      decrypted += decipher.final('utf8')
-      
-      return decrypted
-    } catch (error) {
-      throw new Error('Decryption failed')
-    }
-  }
-  
-  // Field-level encryption for sensitive data
-  encryptField(value) {
-    if (!value) return null
-    return this.encrypt(JSON.stringify(value))
-  }
-  
-  decryptField(encryptedValue) {
-    if (!encryptedValue) return null
-    const decrypted = this.decrypt(encryptedValue)
-    return JSON.parse(decrypted)
-  }
-}
-\`\`\`
 
-### Encryption in Transit
-
-\`\`\`javascript
-import https from 'https'
-import fs from 'fs'
-
-// HTTPS configuration
-const httpsOptions = {
-  key: fs.readFileSync('path/to/private-key.pem'),
-  cert: fs.readFileSync('path/to/certificate.pem'),
-  ca: fs.readFileSync('path/to/ca-certificate.pem'),
+  const result = await db.raw(query, [resourceId]);
   
-  // Security settings
-  secureProtocol: 'TLSv1_2_method',
-  ciphers: [
-    'ECDHE-RSA-AES128-GCM-SHA256',
-    'ECDHE-RSA-AES256-GCM-SHA384',
-    'ECDHE-RSA-AES128-SHA256',
-    'ECDHE-RSA-AES256-SHA384'
-  ].join(':'),
-  honorCipherOrder: true
+  if (!result.rows.length) {
+    return false; // Resource not found
+  }
+
+  return result.rows[0].user_id === userId || result.rows[0].id === userId;
 }
 
-// Create HTTPS server
-const server = https.createServer(httpsOptions, app)
+// Usage in route handler
+app.put('/posts/:id', requirePermission('posts:update'), async (req, res) => {
+  const postId = req.params.id;
+  const userId = req.user.id;
+
+  // Check ownership if required
+  if (req.requireOwnership) {
+    const isOwner = await verifyOwnership('post', postId, userId);
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+  }
+
+  // Proceed with update
+  // ...
+});
 \`\`\`
 
-## Input Validation and Sanitization
+## Input Validation & Sanitization
 
 ### Comprehensive Input Validation
-
 \`\`\`javascript
-import Joi from 'joi'
-import DOMPurify from 'isomorphic-dompurify'
-import validator from 'validator'
+import Joi from 'joi';
+import DOMPurify from 'isomorphic-dompurify';
 
-class InputValidator {
-  static schemas = {
-    user: Joi.object({
-      email: Joi.string().email().required(),
-      firstName: Joi.string().min(2).max(50).pattern(/^[a-zA-Z\s]+$/).required(),
-      lastName: Joi.string().min(2).max(50).pattern(/^[a-zA-Z\s]+$/).required(),
-      age: Joi.number().integer().min(13).max(120),
-      phone: Joi.string().pattern(/^\+?[\d\s\-$$$$]+$/),
-      website: Joi.string().uri()
-    }),
-    
-    product: Joi.object({
-      name: Joi.string().min(2).max(100).required(),
-      description: Joi.string().max(1000),
-      price: Joi.number().positive().precision(2).required(),
-      category: Joi.string().valid('electronics', 'clothing', 'books', 'home').required()
-    })
-  }
+// Validation schemas
+const schemas = {
+  user: Joi.object({
+    email: Joi.string().email().required(),
+    firstName: Joi.string().min(2).max(50).pattern(/^[a-zA-Z\s]+$/).required(),
+    lastName: Joi.string().min(2).max(50).pattern(/^[a-zA-Z\s]+$/).required(),
+    password: Joi.string().min(12).pattern(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
+    ).required()
+  }),
   
-  static validate(data, schemaName) {
-    const schema = this.schemas[schemaName]
-    if (!schema) {
-      throw new Error(`Schema '${schemaName}' not found`)
-    }
-    
-    const { error, value } = schema.validate(data, {
+  post: Joi.object({
+    title: Joi.string().min(5).max(200).required(),
+    content: Joi.string().min(10).max(10000).required(),
+    tags: Joi.array().items(Joi.string().max(30)).max(10)
+  })
+};
+
+// Validation middleware
+export function validateInput(schema) {
+  return (req, res, next) => {
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true
-    })
-    
+    });
+
     if (error) {
       const errors = error.details.map(detail => ({
         field: detail.path.join('.'),
         message: detail.message
-      }))
-      throw new ValidationError('Validation failed', errors)
+      }));
+      
+      return res.status(400).json({ errors });
     }
-    
-    return value
-  }
-  
-  static sanitizeHtml(html) {
-    return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p', 'br'],
-      ALLOWED_ATTR: []
-    })
-  }
-  
-  static sanitizeString(str) {
-    if (typeof str !== 'string') return str
-    
-    return validator.escape(str.trim())
-  }
-  
-  static validateAndSanitize(data, schemaName) {
-    // First validate structure
-    const validatedData = this.validate(data, schemaName)
-    
-    // Then sanitize string fields
-    const sanitized = {}
-    for (const [key, value] of Object.entries(validatedData)) {
-      if (typeof value === 'string') {
-        sanitized[key] = this.sanitizeString(value)
-      } else {
-        sanitized[key] = value
-      }
-    }
-    
-    return sanitized
-  }
+
+    req.validatedData = value;
+    next();
+  };
+}
+
+// HTML sanitization
+export function sanitizeHTML(html) {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'a'],
+    ALLOWED_ATTR: ['href', 'target'],
+    ALLOW_DATA_ATTR: false
+  });
 }
 \`\`\`
 
 ### SQL Injection Prevention
-
 \`\`\`javascript
-import { GRAData } from '@gra-core/data'
+// Always use parameterized queries
+export class SecureDataService {
+  // ❌ NEVER do this - vulnerable to SQL injection
+  static async getUserByEmailUnsafe(email) {
+    return await db.raw(`SELECT * FROM users WHERE email = '${email}'`);
+  }
 
-class SecureDataAccess {
-  constructor() {
-    this.db = new GRAData({
-      apiKey: process.env.GRA_API_KEY,
-      // Enable parameterized queries
-      useParameterizedQueries: true,
-      // Disable dynamic query building
-      allowDynamicQueries: false
-    })
+  // ✅ Always use parameterized queries
+  static async getUserByEmail(email) {
+    return await db.raw('SELECT * FROM users WHERE email = ?', [email]);
   }
-  
-  // Safe query with parameters
-  async findUserByEmail(email) {
-    // This uses parameterized queries internally
-    return await this.db.User.findOne({ email })
+
+  // ✅ Using query builder (also safe)
+  static async getUserByEmailBuilder(email) {
+    return await User.query().where('email', email).first();
   }
-  
-  // Safe raw query (if needed)
-  async customQuery(userId) {
-    const query = `
-      SELECT u.*, p.name as profile_name 
-      FROM users u 
-      LEFT JOIN profiles p ON u.id = p.user_id 
-      WHERE u.id = ?
-    `
-    
-    return await this.db.raw(query, [userId])
-  }
-  
-  // Dangerous - DON'T DO THIS
-  async unsafeQuery(userInput) {
-    // This is vulnerable to SQL injection
-    const query = `SELECT * FROM users WHERE name = '${userInput}'`
-    return await this.db.raw(query) // NEVER DO THIS
+
+  // ✅ Complex queries with multiple parameters
+  static async searchPosts(searchTerm, userId, status) {
+    return await db.raw(`
+      SELECT p.*, u.first_name, u.last_name 
+      FROM posts p 
+      JOIN users u ON p.user_id = u.id 
+      WHERE p.title ILIKE ? 
+        AND p.user_id = ? 
+        AND p.status = ?
+      ORDER BY p.created_at DESC
+    `, [`%${searchTerm}%`, userId, status]);
   }
 }
 \`\`\`
 
-## API Security
+## Data Protection
 
-### Rate Limiting
-
+### Encryption at Rest
 \`\`\`javascript
-import rateLimit from 'express-rate-limit'
-import RedisStore from 'rate-limit-redis'
-import Redis from 'ioredis'
+import crypto from 'crypto';
 
-const redis = new Redis(process.env.REDIS_URL)
+export class EncryptionService {
+  constructor() {
+    this.algorithm = 'aes-256-gcm';
+    this.keyLength = 32;
+    this.ivLength = 16;
+    this.tagLength = 16;
+  }
 
-// Different rate limits for different endpoints
-const createRateLimiter = (windowMs, max, message) => {
-  return rateLimit({
-    store: new RedisStore({
-      client: redis,
-      prefix: 'rl:'
-    }),
-    windowMs,
-    max,
-    message: { error: message },
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req) => {
-      // Use user ID if authenticated, otherwise IP
-      return req.user?.id || req.ip
-    }
-  })
+  // Encrypt sensitive data
+  encrypt(text, key) {
+    const iv = crypto.randomBytes(this.ivLength);
+    const cipher = crypto.createCipher(this.algorithm, key, iv);
+    
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    const tag = cipher.getAuthTag();
+    
+    return {
+      encrypted,
+      iv: iv.toString('hex'),
+      tag: tag.toString('hex')
+    };
+  }
+
+  // Decrypt sensitive data
+  decrypt(encryptedData, key) {
+    const decipher = crypto.createDecipher(
+      this.algorithm,
+      key,
+      Buffer.from(encryptedData.iv, 'hex')
+    );
+    
+    decipher.setAuthTag(Buffer.from(encryptedData.tag, 'hex'));
+    
+    let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  }
 }
 
-// Apply different limits
-const generalLimiter = createRateLimiter(15 * 60 * 1000, 100, 'Too many requests')
-const authLimiter = createRateLimiter(15 * 60 * 1000, 5, 'Too many authentication attempts')
-const apiLimiter = createRateLimiter(60 * 1000, 1000, 'API rate limit exceeded')
+// Usage for sensitive fields
+export class UserService {
+  static async createUser(userData) {
+    const encryption = new EncryptionService();
+    
+    // Encrypt sensitive data
+    if (userData.ssn) {
+      const encryptedSSN = encryption.encrypt(userData.ssn, process.env.ENCRYPTION_KEY);
+      userData.ssn_encrypted = JSON.stringify(encryptedSSN);
+      delete userData.ssn;
+    }
 
-// Usage
-app.use('/api/', apiLimiter)
-app.use('/auth/', authLimiter)
-app.use(generalLimiter)
+    return await User.create(userData);
+  }
+}
+\`\`\`
+
+### Data Masking & Anonymization
+\`\`\`javascript
+// Data masking for logs and responses
+export class DataMasker {
+  static maskEmail(email) {
+    const [username, domain] = email.split('@');
+    const maskedUsername = username.charAt(0) + '*'.repeat(username.length - 2) + username.charAt(username.length - 1);
+    return `${maskedUsername}@${domain}`;
+  }
+
+  static maskCreditCard(cardNumber) {
+    return cardNumber.replace(/\d(?=\d{4})/g, '*');
+  }
+
+  static maskSSN(ssn) {
+    return ssn.replace(/\d(?=\d{4})/g, '*');
+  }
+
+  static sanitizeForLogging(data) {
+    const sensitiveFields = ['password', 'ssn', 'creditCard', 'token'];
+    const sanitized = { ...data };
+
+    sensitiveFields.forEach(field => {
+      if (sanitized[field]) {
+        sanitized[field] = '[REDACTED]';
+      }
+    });
+
+    if (sanitized.email) {
+      sanitized.email = this.maskEmail(sanitized.email);
+    }
+
+    return sanitized;
+  }
+}
+\`\`\`
+
+## Security Headers & HTTPS
+
+### Security Headers Configuration
+\`\`\`javascript
+import helmet from 'helmet';
+
+// Comprehensive security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", "https://api.gra-platform.com"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: []
+    }
+  },
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  noSniff: true,
+  frameguard: { action: 'deny' },
+  xssFilter: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+}));
+
+// Additional security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
 \`\`\`
 
 ### CORS Configuration
-
 \`\`\`javascript
-import cors from 'cors'
+import cors from 'cors';
 
 const corsOptions = {
-  origin: (origin, callback) => {
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || []
+  origin: function (origin, callback) {
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
     
     // Allow requests with no origin (mobile apps, etc.)
-    if (!origin) return callback(null, true)
+    if (!origin) return callback(null, true);
     
     if (allowedOrigins.includes(origin)) {
-      callback(null, true)
+      callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'))
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
   maxAge: 86400 // 24 hours
-}
+};
 
-app.use(cors(corsOptions))
+app.use(cors(corsOptions));
 \`\`\`
 
-### API Key Management
+## Rate Limiting & DDoS Protection
 
+### Rate Limiting Implementation
 \`\`\`javascript
-class APIKeyManager {
-  static async generateAPIKey(userId, permissions = []) {
-    const keyId = crypto.randomUUID()
-    const keySecret = crypto.randomBytes(32).toString('hex')
-    const hashedSecret = await bcrypt.hash(keySecret, 12)
-    
-    const apiKey = {
-      id: keyId,
-      userId,
-      hashedSecret,
-      permissions,
-      isActive: true,
-      createdAt: new Date(),
-      lastUsedAt: null,
-      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year
-    }
-    
-    await APIKey.create(apiKey)
-    
-    // Return the full key only once
-    return {
-      keyId,
-      keySecret: `gra_${keyId}_${keySecret}`,
-      permissions
-    }
-  }
-  
-  static async validateAPIKey(keyString) {
-    try {
-      const [prefix, keyId, keySecret] = keyString.split('_')
-      
-      if (prefix !== 'gra' || !keyId || !keySecret) {
-        throw new Error('Invalid API key format')
-      }
-      
-      const apiKey = await APIKey.findOne({ 
-        id: keyId, 
-        isActive: true,
-        expiresAt: { $gt: new Date() }
-      })
-      
-      if (!apiKey) {
-        throw new Error('API key not found or expired')
-      }
-      
-      const isValid = await bcrypt.compare(keySecret, apiKey.hashedSecret)
-      if (!isValid) {
-        throw new Error('Invalid API key')
-      }
-      
-      // Update last used timestamp
-      await APIKey.updateOne(
-        { id: keyId },
-        { lastUsedAt: new Date() }
-      )
-      
-      return {
-        userId: apiKey.userId,
-        permissions: apiKey.permissions
-      }
-    } catch (error) {
-      throw new Error('API key validation failed')
-    }
-  }
-}
+import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
+import Redis from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL);
+
+// General rate limiting
+const generalLimiter = rateLimit({
+  store: new RedisStore({
+    client: redis,
+    prefix: 'rl:general:'
+  }),
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Strict rate limiting for authentication endpoints
+const authLimiter = rateLimit({
+  store: new RedisStore({
+    client: redis,
+    prefix: 'rl:auth:'
+  }),
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login attempts per windowMs
+  message: 'Too many login attempts, please try again later',
+  skipSuccessfulRequests: true
+});
+
+// Apply rate limiting
+app.use('/api/', generalLimiter);
+app.use('/api/auth/', authLimiter);
 \`\`\`
 
-## Infrastructure Security
-
-### Environment Configuration
-
+### Advanced DDoS Protection
 \`\`\`javascript
-// config/security.js
-export const securityConfig = {
-  // Helmet.js configuration
-  helmet: {
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https:"],
-        scriptSrc: ["'self'"],
-        connectSrc: ["'self'", process.env.API_BASE_URL]
-      }
-    },
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true
-    }
-  },
-  
-  // Session configuration
-  session: {
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'strict'
-    }
-  }
-}
-\`\`\`
+// Request size limiting
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-### Security Headers
-
-\`\`\`javascript
-import helmet from 'helmet'
-
-app.use(helmet(securityConfig.helmet))
-
-// Additional security headers
+// Slow loris protection
 app.use((req, res, next) => {
-  res.setHeader('X-Frame-Options', 'DENY')
-  res.setHeader('X-Content-Type-Options', 'nosniff')
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
-  next()
-})
+  req.setTimeout(30000, () => {
+    res.status(408).json({ error: 'Request timeout' });
+  });
+  next();
+});
+
+// IP-based blocking
+const blockedIPs = new Set();
+
+app.use((req, res, next) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  
+  if (blockedIPs.has(clientIP)) {
+    return res.status(403).json({ error: 'IP blocked' });
+  }
+  
+  next();
+});
 \`\`\`
 
-## Monitoring and Logging
+## Logging & Monitoring
 
 ### Security Event Logging
-
 \`\`\`javascript
-import winston from 'winston'
+import winston from 'winston';
 
 const securityLogger = winston.createLogger({
   level: 'info',
@@ -593,157 +563,382 @@ const securityLogger = winston.createLogger({
   ),
   transports: [
     new winston.transports.File({ filename: 'logs/security.log' }),
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
+    new winston.transports.Console()
   ]
-})
+});
 
-class SecurityMonitor {
-  static logAuthAttempt(req, success, userId = null) {
-    securityLogger.info('Authentication attempt', {
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-      success,
-      userId,
-      timestamp: new Date().toISOString()
-    })
-  }
+// Security event types
+const SecurityEvents = {
+  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
+  LOGIN_FAILURE: 'LOGIN_FAILURE',
+  UNAUTHORIZED_ACCESS: 'UNAUTHORIZED_ACCESS',
+  PERMISSION_DENIED: 'PERMISSION_DENIED',
+  SUSPICIOUS_ACTIVITY: 'SUSPICIOUS_ACTIVITY',
+  DATA_BREACH_ATTEMPT: 'DATA_BREACH_ATTEMPT'
+};
+
+export function logSecurityEvent(event, details) {
+  securityLogger.info({
+    event,
+    timestamp: new Date().toISOString(),
+    ip: details.ip,
+    userAgent: details.userAgent,
+    userId: details.userId,
+    resource: details.resource,
+    action: details.action,
+    success: details.success,
+    error: details.error
+  });
+}
+
+// Usage in middleware
+export function securityAuditMiddleware(req, res, next) {
+  const originalSend = res.send;
   
-  static logSuspiciousActivity(req, activity, details = {}) {
-    securityLogger.warn('Suspicious activity detected', {
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-      activity,
-      details,
-      timestamp: new Date().toISOString()
-    })
-  }
+  res.send = function(data) {
+    // Log security-relevant responses
+    if (res.statusCode === 401) {
+      logSecurityEvent(SecurityEvents.UNAUTHORIZED_ACCESS, {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        resource: req.path,
+        action: req.method
+      });
+    } else if (res.statusCode === 403) {
+      logSecurityEvent(SecurityEvents.PERMISSION_DENIED, {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        userId: req.user?.id,
+        resource: req.path,
+        action: req.method
+      });
+    }
+    
+    originalSend.call(this, data);
+  };
   
-  static logSecurityEvent(event, severity, details = {}) {
-    securityLogger.log(severity, 'Security event', {
-      event,
-      details,
-      timestamp: new Date().toISOString()
-    })
+  next();
+}
+\`\`\`
+
+## Security Testing
+
+### Automated Security Tests
+\`\`\`javascript
+// Security test suite
+describe('Security Tests', () => {
+  describe('Authentication', () => {
+    test('should reject weak passwords', async () => {
+      const weakPasswords = ['123456', 'password', 'qwerty'];
+      
+      for (const password of weakPasswords) {
+        const response = await request(app)
+          .post('/api/auth/register')
+          .send({
+            email: 'test@example.com',
+            password,
+            firstName: 'Test',
+            lastName: 'User'
+          });
+        
+        expect(response.status).toBe(400);
+        expect(response.body.errors).toContainEqual(
+          expect.objectContaining({
+            field: 'password',
+            message: expect.stringContaining('password')
+          })
+        );
+      }
+    });
+
+    test('should prevent brute force attacks', async () => {
+      const attempts = [];
+      
+      // Make multiple failed login attempts
+      for (let i = 0; i < 6; i++) {
+        attempts.push(
+          request(app)
+            .post('/api/auth/login')
+            .send({
+              email: 'test@example.com',
+              password: 'wrongpassword'
+            })
+        );
+      }
+      
+      const responses = await Promise.all(attempts);
+      const lastResponse = responses[responses.length - 1];
+      
+      expect(lastResponse.status).toBe(429);
+      expect(lastResponse.body.message).toContain('Too many login attempts');
+    });
+  });
+
+  describe('Input Validation', () => {
+    test('should sanitize HTML input', async () => {
+      const maliciousContent = '<script>alert("XSS")</script><p>Safe content</p>';
+      
+      const response = await request(app)
+        .post('/api/posts')
+        .set('Authorization', `Bearer ${validToken}`)
+        .send({
+          title: 'Test Post',
+          content: maliciousContent
+        });
+      
+      expect(response.status).toBe(201);
+      expect(response.body.content).not.toContain('<script>');
+      expect(response.body.content).toContain('<p>Safe content</p>');
+    });
+
+    test('should prevent SQL injection', async () => {
+      const maliciousEmail = "'; DROP TABLE users; --";
+      
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: maliciousEmail,
+          password: 'password123'
+        });
+      
+      // Should not crash the application
+      expect(response.status).toBe(400);
+      
+      // Verify users table still exists
+      const usersCount = await User.query().count();
+      expect(usersCount).toBeDefined();
+    });
+  });
+
+  describe('Authorization', () => {
+    test('should enforce role-based access control', async () => {
+      const userToken = generateToken({ id: 1, role: 'user' });
+      const adminToken = generateToken({ id: 2, role: 'admin' });
+      
+      // User should not access admin endpoint
+      const userResponse = await request(app)
+        .get('/api/admin/users')
+        .set('Authorization', `Bearer ${userToken}`);
+      
+      expect(userResponse.status).toBe(403);
+      
+      // Admin should access admin endpoint
+      const adminResponse = await request(app)
+        .get('/api/admin/users')
+        .set('Authorization', `Bearer ${adminToken}`);
+      
+      expect(adminResponse.status).toBe(200);
+    });
+  });
+});
+\`\`\`
+
+## Vulnerability Scanning
+
+### Automated Dependency Scanning
+\`\`\`bash
+# Package.json scripts for security scanning
+{
+  "scripts": {
+    "security:audit": "npm audit --audit-level moderate",
+    "security:fix": "npm audit fix",
+    "security:scan": "snyk test",
+    "security:monitor": "snyk monitor"
   }
 }
 \`\`\`
 
-### Intrusion Detection
-
+### Static Code Analysis
 \`\`\`javascript
-class IntrusionDetection {
-  static suspiciousPatterns = [
-    /union.*select/i,
-    /script.*alert/i,
-    /<script/i,
-    /javascript:/i,
-    /eval\(/i,
-    /document\.cookie/i
-  ]
-  
-  static checkForSQLInjection(input) {
-    const sqlPatterns = [
-      /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)/i,
-      /(--|#|\/\*|\*\/)/,
-      /(\b(or|and)\b.*=.*)/i
-    ]
-    
-    return sqlPatterns.some(pattern => pattern.test(input))
+// ESLint security rules configuration
+// .eslintrc.js
+module.exports = {
+  extends: [
+    'eslint:recommended',
+    'plugin:security/recommended'
+  ],
+  plugins: ['security'],
+  rules: {
+    'security/detect-object-injection': 'error',
+    'security/detect-non-literal-regexp': 'error',
+    'security/detect-unsafe-regex': 'error',
+    'security/detect-buffer-noassert': 'error',
+    'security/detect-child-process': 'error',
+    'security/detect-disable-mustache-escape': 'error',
+    'security/detect-eval-with-expression': 'error',
+    'security/detect-no-csrf-before-method-override': 'error',
+    'security/detect-non-literal-fs-filename': 'error',
+    'security/detect-non-literal-require': 'error',
+    'security/detect-possible-timing-attacks': 'error',
+    'security/detect-pseudoRandomBytes': 'error'
   }
-  
-  static checkForXSS(input) {
-    const xssPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /on\w+\s*=/i,
-      /<iframe/i,
-      /<object/i,
-      /<embed/i
-    ]
+};
+\`\`\`
+
+## Incident Response
+
+### Security Incident Handling
+\`\`\`javascript
+// Incident response system
+export class SecurityIncidentHandler {
+  static async handleSecurityIncident(incident) {
+    const severity = this.assessSeverity(incident);
     
-    return xssPatterns.some(pattern => pattern.test(input))
-  }
-  
-  static analyzeRequest(req) {
-    const threats = []
-    
-    // Check all input fields
-    const inputs = { ...req.query, ...req.body, ...req.params }
-    
-    for (const [key, value] of Object.entries(inputs)) {
-      if (typeof value === 'string') {
-        if (this.checkForSQLInjection(value)) {
-          threats.push({ type: 'sql_injection', field: key, value })
-        }
-        
-        if (this.checkForXSS(value)) {
-          threats.push({ type: 'xss', field: key, value })
-        }
-        
-        // Check for suspicious patterns
-        this.suspiciousPatterns.forEach(pattern => {
-          if (pattern.test(value)) {
-            threats.push({ type: 'suspicious_pattern', field: key, pattern: pattern.source })
-          }
-        })
-      }
+    // Log the incident
+    securityLogger.error({
+      type: 'SECURITY_INCIDENT',
+      severity,
+      incident,
+      timestamp: new Date().toISOString()
+    });
+
+    // Immediate response based on severity
+    switch (severity) {
+      case 'CRITICAL':
+        await this.handleCriticalIncident(incident);
+        break;
+      case 'HIGH':
+        await this.handleHighSeverityIncident(incident);
+        break;
+      case 'MEDIUM':
+        await this.handleMediumSeverityIncident(incident);
+        break;
+      default:
+        await this.handleLowSeverityIncident(incident);
     }
+
+    // Notify security team
+    await this.notifySecurityTeam(incident, severity);
+  }
+
+  static async handleCriticalIncident(incident) {
+    // Immediate actions for critical incidents
+    if (incident.type === 'DATA_BREACH') {
+      // Lock down affected systems
+      await this.lockdownSystems(incident.affectedSystems);
+      
+      // Revoke all active sessions
+      await this.revokeAllSessions();
+      
+      // Enable emergency mode
+      await this.enableEmergencyMode();
+    }
+  }
+
+  static assessSeverity(incident) {
+    const criticalTypes = ['DATA_BREACH', 'SYSTEM_COMPROMISE', 'PRIVILEGE_ESCALATION'];
+    const highTypes = ['UNAUTHORIZED_ACCESS', 'INJECTION_ATTACK', 'XSS_ATTACK'];
     
-    return threats
+    if (criticalTypes.includes(incident.type)) return 'CRITICAL';
+    if (highTypes.includes(incident.type)) return 'HIGH';
+    if (incident.affectedUsers > 100) return 'HIGH';
+    if (incident.affectedUsers > 10) return 'MEDIUM';
+    
+    return 'LOW';
   }
 }
+\`\`\`
 
-// Middleware to detect threats
-app.use((req, res, next) => {
-  const threats = IntrusionDetection.analyzeRequest(req)
-  
-  if (threats.length > 0) {
-    SecurityMonitor.logSuspiciousActivity(req, 'potential_attack', { threats })
+## Compliance & Regulations
+
+### GDPR Compliance
+\`\`\`javascript
+// GDPR compliance utilities
+export class GDPRCompliance {
+  // Right to be forgotten
+  static async deleteUserData(userId) {
+    const transaction = await db.transaction();
     
-    // Block request if high-risk threats detected
-    const highRiskThreats = threats.filter(t => 
-      ['sql_injection', 'xss'].includes(t.type)
-    )
-    
-    if (highRiskThreats.length > 0) {
-      return res.status(403).json({ error: 'Request blocked for security reasons' })
+    try {
+      // Delete or anonymize user data across all tables
+      await transaction('users').where('id', userId).del();
+      await transaction('posts').where('user_id', userId).update({
+        user_id: null,
+        author_name: 'Deleted User'
+      });
+      await transaction('comments').where('user_id', userId).del();
+      await transaction('user_sessions').where('user_id', userId).del();
+      
+      // Log the deletion
+      securityLogger.info({
+        event: 'GDPR_DATA_DELETION',
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
     }
   }
-  
-  next()
-})
+
+  // Data export for portability
+  static async exportUserData(userId) {
+    const userData = await User.query()
+      .findById(userId)
+      .withRelated(['posts', 'comments', 'profile']);
+    
+    // Remove sensitive fields
+    const exportData = {
+      profile: {
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        createdAt: userData.createdAt
+      },
+      posts: userData.posts.map(post => ({
+        title: post.title,
+        content: post.content,
+        createdAt: post.createdAt
+      })),
+      comments: userData.comments.map(comment => ({
+        content: comment.content,
+        createdAt: comment.createdAt
+      }))
+    };
+
+    return exportData;
+  }
+}
 \`\`\`
 
 ## Security Checklist
 
-### Development Checklist
+### Pre-Deployment Security Checklist
+- [ ] All dependencies updated and scanned for vulnerabilities
+- [ ] Input validation implemented for all endpoints
+- [ ] Authentication and authorization properly configured
+- [ ] Sensitive data encrypted at rest and in transit
+- [ ] Security headers configured
+- [ ] Rate limiting implemented
+- [ ] Logging and monitoring in place
+- [ ] Error handling doesn't expose sensitive information
+- [ ] HTTPS enforced in production
+- [ ] Database queries use parameterized statements
+- [ ] File upload restrictions implemented
+- [ ] CORS properly configured
+- [ ] Security tests passing
+- [ ] Incident response plan documented
+- [ ] Backup and recovery procedures tested
 
-- [ ] All user inputs are validated and sanitized
-- [ ] Parameterized queries are used for database operations
-- [ ] Sensitive data is encrypted at rest and in transit
-- [ ] Strong authentication mechanisms are implemented
-- [ ] API endpoints are properly secured with rate limiting
-- [ ] Security headers are configured
-- [ ] Error messages don't leak sensitive information
-- [ ] Logging captures security events
-- [ ] Dependencies are regularly updated
-- [ ] Security tests are included in CI/CD pipeline
+### Regular Security Maintenance
+- [ ] Weekly dependency vulnerability scans
+- [ ] Monthly security log reviews
+- [ ] Quarterly penetration testing
+- [ ] Annual security architecture review
+- [ ] Regular security training for development team
+- [ ] Incident response plan testing
+- [ ] Security policy updates
 
-### Production Checklist
+## Conclusion
 
-- [ ] HTTPS is enforced
-- [ ] Security headers are properly configured
-- [ ] Rate limiting is active
-- [ ] Monitoring and alerting are set up
-- [ ] Regular security audits are scheduled
-- [ ] Backup and recovery procedures are tested
-- [ ] Access controls are properly configured
-- [ ] Security patches are applied promptly
+Security is an ongoing process that requires constant vigilance and regular updates. This guide provides a foundation for building secure applications with GRA Core Platform, but security practices should be continuously evaluated and improved based on emerging threats and best practices.
 
-## Next Steps
+Remember: **Security is everyone's responsibility** - from developers to operations teams to end users.
 
-- Learn about [Performance Optimization](./performance-optimization.md)
-- Explore [Advanced Monitoring](./advanced-monitoring.md)
-- Check out [Deployment Security](../06_GCP%20Feature%20InDepth/deployment-security.md)
+## Additional Resources
+- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework)
+- [CIS Controls](https://www.cisecurity.org/controls/)
+- [SANS Security Guidelines](https://www.sans.org/white-papers/)

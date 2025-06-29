@@ -11,59 +11,125 @@ This tutorial covers:
 - Relationships and joins
 - Caching strategies
 - Real-time updates
+- Database operations
+- Advanced querying
+- Data synchronization
+- Performance optimization
+
+## Prerequisites
+
+- Completed [Basic Setup Tutorial](./basic-setup.md)
+- Understanding of databases (SQL/NoSQL)
+- Familiarity with data modeling concepts
+
+## Data Storage Options
+
+GRA Core Platform supports multiple data storage solutions:
+- **PostgreSQL**: Relational database for structured data
+- **MongoDB**: Document database for flexible schemas
+- **Redis**: In-memory cache for high-performance operations
+- **Cloud Storage**: File and blob storage
+
+## Step 1: Database Configuration
+
+### Configure Database Connection
+
+\`\`\`javascript
+// gra.config.js
+module.exports = {
+  database: {
+    primary: {
+      type: 'postgresql',
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      database: process.env.DB_NAME,
+      username: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      ssl: true
+    },
+    cache: {
+      type: 'redis',
+      host: process.env.REDIS_HOST,
+      port: process.env.REDIS_PORT,
+      password: process.env.REDIS_PASSWORD
+    }
+  }
+}
+\`\`\`
+
+### Environment Variables
+
+\`\`\`env
+# Add to .env
+DB_HOST=your_db_host
+DB_PORT=5432
+DB_NAME=gra_app
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+REDIS_HOST=your_redis_host
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password
+\`\`\`
 
 ## Setting Up Data Models
 
 ### Basic Model Definition
 
 \`\`\`javascript
-import { GRAData } from '@gra-core/data'
+import { GRAModel } from '@gra/database';
 
-const data = new GRAData({
-  apiKey: process.env.GRA_API_KEY,
-  database: 'production'
-})
+export class User extends GRAModel {
+  static tableName = 'users';
+  
+  static schema = {
+    id: { type: 'uuid', primary: true },
+    email: { type: 'string', unique: true, required: true },
+    firstName: { type: 'string', required: true },
+    lastName: { type: 'string', required: true },
+    createdAt: { type: 'timestamp', default: 'now' },
+    updatedAt: { type: 'timestamp', default: 'now' }
+  };
 
-// Define a User model
-const User = data.model('User', {
-  id: { type: 'string', primary: true },
-  email: { type: 'string', required: true, unique: true },
-  firstName: { type: 'string', required: true },
-  lastName: { type: 'string', required: true },
-  age: { type: 'number', min: 0, max: 150 },
-  isActive: { type: 'boolean', default: true },
-  createdAt: { type: 'date', default: Date.now },
-  updatedAt: { type: 'date', default: Date.now }
-})
+  static relationships = {
+    posts: { type: 'hasMany', model: 'Post' },
+    profile: { type: 'hasOne', model: 'UserProfile' }
+  };
+}
 \`\`\`
 
 ### Advanced Schema with Validation
 
 \`\`\`javascript
-const Product = data.model('Product', {
-  id: { type: 'string', primary: true },
-  name: { 
-    type: 'string', 
-    required: true,
-    minLength: 2,
-    maxLength: 100
-  },
-  description: { type: 'text' },
-  price: { 
-    type: 'number', 
-    required: true,
-    min: 0,
-    validate: (value) => value > 0 || 'Price must be positive'
-  },
-  category: {
-    type: 'string',
-    enum: ['electronics', 'clothing', 'books', 'home'],
-    required: true
-  },
-  tags: { type: 'array', items: { type: 'string' } },
-  metadata: { type: 'object' },
-  isAvailable: { type: 'boolean', default: true }
-})
+import { GRAModel } from '@gra/database';
+
+export class Product extends GRAModel {
+  static tableName = 'products';
+  
+  static schema = {
+    id: { type: 'uuid', primary: true },
+    name: { 
+      type: 'string', 
+      required: true,
+      minLength: 2,
+      maxLength: 100
+    },
+    description: { type: 'text' },
+    price: { 
+      type: 'number', 
+      required: true,
+      min: 0,
+      validate: (value) => value > 0 || 'Price must be positive'
+    },
+    category: {
+      type: 'string',
+      enum: ['electronics', 'clothing', 'books', 'home'],
+      required: true
+    },
+    tags: { type: 'array', items: { type: 'string' } },
+    metadata: { type: 'object' },
+    isAvailable: { type: 'boolean', default: true }
+  };
+}
 \`\`\`
 
 ## CRUD Operations
@@ -226,22 +292,33 @@ async function hardDeleteUser(id) {
 
 \`\`\`javascript
 // Define related models
-const Order = data.model('Order', {
-  id: { type: 'string', primary: true },
-  userId: { type: 'string', ref: 'User', required: true },
-  items: [{ 
-    productId: { type: 'string', ref: 'Product' },
-    quantity: { type: 'number', min: 1 },
-    price: { type: 'number', min: 0 }
-  }],
-  total: { type: 'number', min: 0 },
-  status: { 
-    type: 'string', 
-    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
-    default: 'pending'
-  },
-  createdAt: { type: 'date', default: Date.now }
-})
+import { GRAModel } from '@gra/database';
+
+export class Order extends GRAModel {
+  static tableName = 'orders';
+  
+  static schema = {
+    id: { type: 'uuid', primary: true },
+    userId: { type: 'uuid', ref: 'User', required: true },
+    items: [{ 
+      productId: { type: 'uuid', ref: 'Product' },
+      quantity: { type: 'number', min: 1 },
+      price: { type: 'number', min: 0 }
+    }],
+    total: { type: 'number', min: 0 },
+    status: { 
+      type: 'enum', 
+      values: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+      default: 'pending'
+    },
+    createdAt: { type: 'timestamp', default: 'now' }
+  };
+
+  static relationships = {
+    user: { type: 'belongsTo', model: 'User', foreignKey: 'userId' },
+    products: { type: 'hasMany', model: 'Product', foreignKey: 'productId' }
+  };
+}
 
 // Query with population
 async function getUserWithOrders(userId) {
@@ -260,20 +337,37 @@ async function getUserWithOrders(userId) {
 ### Many-to-Many Relationships
 
 \`\`\`javascript
-const Tag = data.model('Tag', {
-  id: { type: 'string', primary: true },
-  name: { type: 'string', required: true, unique: true },
-  color: { type: 'string', default: '#000000' }
-})
+import { GRAModel } from '@gra/database';
 
-const Article = data.model('Article', {
-  id: { type: 'string', primary: true },
-  title: { type: 'string', required: true },
-  content: { type: 'text', required: true },
-  authorId: { type: 'string', ref: 'User', required: true },
-  tags: [{ type: 'string', ref: 'Tag' }],
-  publishedAt: { type: 'date' }
-})
+export class Tag extends GRAModel {
+  static tableName = 'tags';
+  
+  static schema = {
+    id: { type: 'uuid', primary: true },
+    name: { type: 'string', required: true, unique: true },
+    color: { type: 'string', default: '#000000' }
+  };
+}
+
+import { GRAModel } from '@gra/database';
+
+export class Article extends GRAModel {
+  static tableName = 'articles';
+  
+  static schema = {
+    id: { type: 'uuid', primary: true },
+    title: { type: 'string', required: true },
+    content: { type: 'text', required: true },
+    authorId: { type: 'uuid', ref: 'User', required: true },
+    tags: [{ type: 'uuid', ref: 'Tag' }],
+    publishedAt: { type: 'timestamp' }
+  };
+
+  static relationships = {
+    author: { type: 'belongsTo', model: 'User', foreignKey: 'authorId' },
+    tags: { type: 'belongsToMany', model: 'Tag', through: 'article_tags' }
+  };
+}
 
 // Query articles with tags
 async function getArticlesWithTags() {
@@ -296,32 +390,49 @@ async function getArticlesWithTags() {
 ### Custom Validators
 
 \`\`\`javascript
-const UserProfile = data.model('UserProfile', {
-  userId: { type: 'string', ref: 'User', required: true },
-  bio: { 
-    type: 'string',
-    maxLength: 500,
-    validate: {
-      validator: (value) => !value.includes('spam'),
-      message: 'Bio cannot contain spam content'
+import { GRAValidator } from '@gra/validation';
+
+export const userValidationRules = {
+  create: {
+    email: {
+      required: true,
+      email: true,
+      unique: { table: 'users', column: 'email' }
+    },
+    firstName: {
+      required: true,
+      minLength: 2,
+      maxLength: 50
+    },
+    lastName: {
+      required: true,
+      minLength: 2,
+      maxLength: 50
+    },
+    password: {
+      required: true,
+      minLength: 8,
+      pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
     }
   },
-  website: {
-    type: 'string',
-    validate: {
-      validator: (value) => {
-        const urlRegex = /^https?:\/\/.+/
-        return !value || urlRegex.test(value)
-      },
-      message: 'Website must be a valid URL'
+  update: {
+    firstName: {
+      optional: true,
+      minLength: 2,
+      maxLength: 50
+    },
+    lastName: {
+      optional: true,
+      minLength: 2,
+      maxLength: 50
     }
-  },
-  socialLinks: {
-    twitter: { type: 'string' },
-    linkedin: { type: 'string' },
-    github: { type: 'string' }
   }
-})
+};
+
+export function validateUser(data, operation = 'create') {
+  const validator = new GRAValidator();
+  return validator.validate(data, userValidationRules[operation]);
+}
 \`\`\`
 
 ### Pre/Post Hooks
@@ -331,21 +442,21 @@ const UserProfile = data.model('UserProfile', {
 User.pre('save', function(next) {
   // Hash password before saving
   if (this.isModified('password')) {
-    this.password = hashPassword(this.password)
+    this.password = hashPassword(this.password);
   }
   
   // Update timestamp
-  this.updatedAt = new Date()
-  next()
-})
+  this.updatedAt = new Date();
+  next();
+});
 
 // Post-save hook
 User.post('save', function(doc) {
   // Send welcome email for new users
   if (doc.isNew) {
-    sendWelcomeEmail(doc.email)
+    sendWelcomeEmail(doc.email);
   }
-})
+});
 \`\`\`
 
 ## Caching Strategies
@@ -353,32 +464,28 @@ User.post('save', function(doc) {
 ### Basic Caching
 
 \`\`\`javascript
-import { GRACache } from '@gra-core/cache'
+import { GRACache } from '@gra/cache';
 
-const cache = new GRACache({
-  provider: 'redis',
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT
-})
+const cache = new GRACache();
 
 async function getCachedUser(id) {
   try {
     // Try cache first
-    let user = await cache.get(`user:${id}`)
+    let user = await cache.get(`user:${id}`);
     
     if (!user) {
       // Fetch from database
-      user = await User.findById(id)
+      user = await User.findById(id);
       
       // Cache for 1 hour
-      await cache.set(`user:${id}`, user, 3600)
+      await cache.set(`user:${id}`, user, 3600);
     }
     
-    return user
+    return user;
   } catch (error) {
-    console.error('Cache operation failed:', error)
+    console.error('Cache operation failed:', error);
     // Fallback to database
-    return await User.findById(id)
+    return await User.findById(id);
   }
 }
 \`\`\`
@@ -389,15 +496,15 @@ async function getCachedUser(id) {
 // Invalidate cache on update
 async function updateUserWithCache(id, updates) {
   try {
-    const user = await User.findByIdAndUpdate(id, updates, { new: true })
+    const user = await User.findByIdAndUpdate(id, updates, { new: true });
     
     // Invalidate cache
-    await cache.del(`user:${id}`)
+    await cache.del(`user:${id}`);
     
-    return user
+    return user;
   } catch (error) {
-    console.error('Update with cache failed:', error)
-    throw error
+    console.error('Update with cache failed:', error);
+    throw error;
   }
 }
 \`\`\`
@@ -407,118 +514,159 @@ async function updateUserWithCache(id, updates) {
 ### WebSocket Integration
 
 \`\`\`javascript
-import { GRAWebSocket } from '@gra-core/websocket'
+import { GRAWebSocket } from '@gra/websocket';
+import { DataService } from './dataService';
 
-const ws = new GRAWebSocket({
-  url: process.env.GRA_WEBSOCKET_URL,
-  apiKey: process.env.GRA_API_KEY
-})
-
-// Subscribe to data changes
-ws.subscribe('users', (event) => {
-  switch (event.type) {
-    case 'created':
-      console.log('New user created:', event.data)
-      break
-    case 'updated':
-      console.log('User updated:', event.data)
-      break
-    case 'deleted':
-      console.log('User deleted:', event.data)
-      break
+export class SyncService {
+  constructor() {
+    this.ws = new GRAWebSocket();
+    this.setupEventHandlers();
   }
-})
 
-// Emit changes
-User.post('save', function(doc) {
-  ws.emit('users', {
-    type: doc.isNew ? 'created' : 'updated',
-    data: doc
-  })
-})
-\`\`\`
+  setupEventHandlers() {
+    // Listen for data changes
+    this.ws.on('user:updated', async (data) => {
+      // Update local cache
+      await DataService.updateUser(data.userId, data.changes);
+      
+      // Notify UI components
+      this.emit('userUpdated', data);
+    });
 
-## Performance Optimization
-
-### Indexing
-
-\`\`\`javascript
-// Create indexes for better query performance
-User.index({ email: 1 }, { unique: true })
-User.index({ isActive: 1, createdAt: -1 })
-User.index({ firstName: 'text', lastName: 'text' })
-
-Order.index({ userId: 1, createdAt: -1 })
-Order.index({ status: 1 })
-\`\`\`
-
-### Aggregation Pipelines
-
-\`\`\`javascript
-async function getUserStats() {
-  try {
-    const stats = await User.aggregate([
-      {
-        $match: { isActive: true }
-      },
-      {
-        $group: {
-          _id: null,
-          totalUsers: { $sum: 1 },
-          averageAge: { $avg: '$age' },
-          oldestUser: { $max: '$age' },
-          youngestUser: { $min: '$age' }
-        }
-      }
-    ])
-    
-    return stats[0]
-  } catch (error) {
-    console.error('Aggregation failed:', error)
-    throw error
+    this.ws.on('post:created', async (data) => {
+      // Invalidate relevant caches
+      await cache.delete(`user:${data.userId}:posts`);
+      
+      // Notify UI
+      this.emit('postCreated', data);
+    });
   }
-}
-\`\`\`
 
-## Error Handling
-
-### Comprehensive Error Handling
-
-\`\`\`javascript
-class DataService {
-  async createUser(userData) {
+  // Sync data changes to server
+  async syncUserUpdate(userId, changes) {
     try {
-      // Validate input
-      if (!userData.email || !userData.firstName) {
-        throw new ValidationError('Email and first name are required')
-      }
+      // Update locally first
+      await DataService.updateUser(userId, changes);
       
-      // Check for duplicates
-      const existingUser = await User.findOne({ email: userData.email })
-      if (existingUser) {
-        throw new DuplicateError('User with this email already exists')
-      }
-      
-      // Create user
-      const user = await User.create(userData)
-      return user
-      
+      // Sync to server
+      await this.ws.emit('sync:user:update', {
+        userId,
+        changes,
+        timestamp: Date.now()
+      });
     } catch (error) {
-      if (error instanceof ValidationError) {
-        throw error
-      } else if (error.code === 11000) {
-        throw new DuplicateError('Duplicate key error')
-      } else {
-        console.error('Unexpected error:', error)
-        throw new DatabaseError('Failed to create user')
-      }
+      console.error('Sync failed:', error);
+      // Implement retry logic
     }
   }
 }
 \`\`\`
 
+## Performance Optimization
+
+### Database Indexing
+
+\`\`\`sql
+-- Create indexes for better query performance
+CREATE INDEX idx_posts_user_id ON posts(user_id);
+CREATE INDEX idx_posts_status ON posts(status);
+CREATE INDEX idx_posts_created_at ON posts(created_at);
+CREATE INDEX idx_users_email ON users(email);
+
+-- Composite indexes for complex queries
+CREATE INDEX idx_posts_status_created_at ON posts(status, created_at);
+\`\`\`
+
+### Query Optimization
+
+\`\`\`javascript
+// src/services/optimizedQueries.js
+export class OptimizedQueries {
+  // Use database views for complex queries
+  static async getUserDashboardData(userId) {
+    return await db.raw(`
+      SELECT 
+        u.id,
+        u.first_name,
+        u.last_name,
+        COUNT(p.id) as post_count,
+        MAX(p.created_at) as last_post_date
+      FROM users u
+      LEFT JOIN posts p ON u.id = p.user_id
+      WHERE u.id = ?
+      GROUP BY u.id, u.first_name, u.last_name
+    `, [userId]);
+  }
+
+  // Batch operations for better performance
+  static async createMultiplePosts(postsData) {
+    return await Post.insertMany(postsData);
+  }
+}
+\`\`\`
+
+## Testing Data Operations
+
+### Unit Tests
+
+\`\`\`javascript
+// tests/dataService.test.js
+import { DataService } from '../src/services/dataService';
+import { User } from '../src/models/User';
+
+describe('DataService', () => {
+  beforeEach(async () => {
+    // Setup test database
+    await setupTestDatabase();
+  });
+
+  afterEach(async () => {
+    // Cleanup
+    await cleanupTestDatabase();
+  });
+
+  test('should create user successfully', async () => {
+    const userData = {
+      email: 'test@example.com',
+      firstName: 'John',
+      lastName: 'Doe'
+    };
+
+    const user = await DataService.createUser(userData);
+    
+    expect(user.id).toBeDefined();
+    expect(user.email).toBe(userData.email);
+  });
+
+  test('should cache user data', async () => {
+    const user = await DataService.createUser({
+      email: 'cache@example.com',
+      firstName: 'Cache',
+      lastName: 'Test'
+    });
+
+    // First call - from database
+    const user1 = await DataService.getUserById(user.id);
+    
+    // Second call - from cache
+    const user2 = await DataService.getUserById(user.id);
+    
+    expect(user1).toEqual(user2);
+  });
+});
+\`\`\`
+
+## Best Practices
+
+1. **Use Transactions**: For operations affecting multiple tables
+2. **Implement Caching**: Cache frequently accessed data
+3. **Validate Input**: Always validate data before database operations
+4. **Handle Errors**: Implement proper error handling and logging
+5. **Monitor Performance**: Track query performance and optimize slow queries
+6. **Backup Strategy**: Implement regular database backups
+
 ## Next Steps
 
-- Explore [Advanced Querying](../05_Development%20Guide/advanced-querying.md)
-- Learn about [Performance Optimization](../05_Development%20Guide/performance-optimization.md)
-- Check out [Real-time Features](../06_GCP%20Feature%20InDepth/real-time-data.md)
+- Explore [Performance Optimization](../05_Development%20Guide/performance-optimization.md)
+- Learn about [Security Best Practices](../05_Development%20Guide/security-best-practices.md)
+- Review [API Reference](../03_API%20Reference/api-reference.md)
