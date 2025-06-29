@@ -7,6 +7,7 @@ import { TableOfContents } from "@/components/table-of-contents"
 import { Badge } from "@/components/ui/badge"
 import { Book, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 // Navigation structure for determining next/previous pages
 const navigationOrder = [
@@ -355,7 +356,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b bg-white/95 backdrop-blur-sm">
         <div className="flex items-center justify-between px-6 py-3">
-          <div className="flex items-center space-x-3">
+          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
               <Book className="w-4 h-4 text-white" />
             </div>
@@ -363,7 +364,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
               <h1 className="text-lg font-bold text-slate-900">GRA Core Platform</h1>
               <p className="text-xs text-slate-600">Documentation</p>
             </div>
-          </div>
+          </Link>
 
           {/* Center Navigation Tabs */}
           <div className="flex items-center space-x-8">
