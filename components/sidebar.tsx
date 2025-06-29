@@ -192,21 +192,6 @@ export function Sidebar() {
               <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="truncate">{item.title}</div>
-                {item.metadata && (
-                  <div className="flex items-center space-x-1 mt-1">
-                    {item.metadata.difficulty && (
-                      <Badge variant="outline" className="text-xs px-1 py-0">
-                        {item.metadata.difficulty}
-                      </Badge>
-                    )}
-                    {item.metadata.estimatedReadTime && (
-                      <div className="flex items-center text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {item.metadata.estimatedReadTime}min
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </Button>
