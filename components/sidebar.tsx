@@ -63,6 +63,7 @@ export function Sidebar() {
   const [navigation, setNavigation] = useState<NavItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isExpandedAll, setIsExpandedAll] = useState(true)
 
   // Load navigation from API
   useEffect(() => {
@@ -79,6 +80,7 @@ export function Sidebar() {
         // Auto-expand all folders by default
         const expandedFolders = extractFolderNames(data)
         setExpandedSections(expandedFolders)
+        setIsExpandedAll(true)
 
         setError(null)
       } catch (err) {
@@ -179,6 +181,19 @@ export function Sidebar() {
     setSearchQuery("")
     setSearchResults([])
     setIsSearching(false)
+  }
+
+  const toggleExpandAll = () => {
+    if (isExpandedAll) {
+      // Collapse all
+      setExpandedSections([])
+      setIsExpandedAll(false)
+    } else {
+      // Expand all
+      const allFolders = extractFolderNames(navigation)
+      setExpandedSections(allFolders)
+      setIsExpandedAll(true)
+    }
   }
 
   // Recursive component to render navigation items
@@ -288,6 +303,32 @@ export function Sidebar() {
       {/* Navigation / Search Results */}
       <ScrollArea className="flex-1 px-4">
         <div className="py-4 space-y-2 min-w-0">
+          {/* Expand/Collapse All Toggle */}
+          {!isSearching && navigation.length > 0 && (
+            <div className="mb-4 flex justify-center">
+              <button
+                onClick={toggleExpandAll}
+                className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full border transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-1"
+                style={{
+                  backgroundColor: isExpandedAll ? "#f1f5f9" : "#e2e8f0",
+                  borderColor: isExpandedAll ? "#cbd5e1" : "#94a3b8",
+                  color: isExpandedAll ? "#475569" : "#64748b",
+                }}
+              >
+                {isExpandedAll ? (
+                  <>
+                    <ChevronDown className="w-3 h-3 mr-1" />
+                    Collapse All
+                  </>
+                ) : (
+                  <>
+                    <ChevronRight className="w-3 h-3 mr-1" />
+                    Expand All
+                  </>
+                )}
+              </button>
+            </div>
+          )}
           {isLoading ? (
             // Loading state
             <div className="flex items-center justify-center py-8">
