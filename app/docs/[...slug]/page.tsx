@@ -8,16 +8,7 @@ import { Header } from "@/components/header"
 import { promises as fs } from "fs"
 import path from "path"
 import matter from "gray-matter"
-
-// Navigation structure for determining next/previous pages
-const navigationOrder = [
-  { slug: "introduction", title: "Introduction to GRA Core Platform" },
-  { slug: "user-guide", title: "User Guide" },
-  { slug: "api-reference", title: "API Reference" },
-  { slug: "examples", title: "Examples & Tutorials" },
-  { slug: "development", title: "Development Guide" },
-  { slug: "architecture", title: "Platform Architecture" },
-]
+import { getPageNavigation } from "@/lib/docs-navigation"
 
 // Tries to load a real Markdown file from the docs folder.
 // Falls back to the previous mockContent object if the file is not found.
@@ -337,30 +328,6 @@ All data is encrypted at rest and in transit.`,
   }
 }
 
-const getPageNavigation = (currentSlug: string) => {
-  const currentIndex = navigationOrder.findIndex((item) => item.slug === currentSlug)
-
-  if (currentIndex === -1) return { previousPage: null, nextPage: null }
-
-  const previousPage =
-    currentIndex > 0
-      ? {
-          title: navigationOrder[currentIndex - 1].title,
-          href: `/docs/${navigationOrder[currentIndex - 1].slug}`,
-        }
-      : null
-
-  const nextPage =
-    currentIndex < navigationOrder.length - 1
-      ? {
-          title: navigationOrder[currentIndex + 1].title,
-          href: `/docs/${navigationOrder[currentIndex + 1].slug}`,
-        }
-      : null
-
-  return { previousPage, nextPage }
-}
-
 export default async function DocPage({ params }: { params: Promise<{ slug: string[] }> }) {
   const { slug } = await params
   const doc = await getDocContent(slug)
@@ -369,8 +336,8 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
     notFound()
   }
 
-  const currentSlug = slug.join("/")
-  const { previousPage, nextPage } = getPageNavigation(currentSlug)
+  const currentHref = `/docs/${slug.join("/")}`
+  const { previousPage, nextPage } = await getPageNavigation(currentHref)
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
