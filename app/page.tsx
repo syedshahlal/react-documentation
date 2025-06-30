@@ -12,50 +12,50 @@ const documentationSections = [
     title: "GRA Core Platform Introduction",
     description: "Get started with GRA Core Platform fundamentals and core concepts.",
     icon: Book,
-    href: "/docs/introduction", // This should match your actual file: docs/01_GRA_Core_Platform Introduction/introduction.md
+    href: "/docs/gcp-5.7/01_GRA_Core_Platform Introduction/introduction",
     color: "bg-blue-500",
   },
   {
     title: "User Guide",
     description: "Complete guide to using GRA Core Platform with step-by-step instructions.",
     icon: Users,
-    href: "/docs/user-guide", // This should match: docs/02_User Guide/user-guide.md
+    href: "/docs/gcp-5.7/02_User Guide/user-guide",
     color: "bg-green-500",
   },
   {
     title: "API Reference",
     description: "Comprehensive API documentation with examples and authentication guides.",
     icon: Code,
-    href: "/docs/api-reference", // This should match: docs/03_API Reference/api-reference.md
+    href: "/docs/gcp-5.7/03_API Reference/api-reference",
     color: "bg-purple-500",
   },
   {
     title: "Examples & Tutorials",
     description: "Real-world examples and step-by-step tutorials for common use cases.",
     icon: Layers,
-    href: "/docs/basic-setup", // This should match: docs/04_Examples & Tutorials/basic-setup.md
+    href: "/docs/gcp-5.7/04_Examples & Tutorials/basic-setup",
     color: "bg-orange-500",
   },
   {
     title: "Development Guide",
     description: "Development workflows, contribution guidelines, and advanced topics.",
     icon: Wrench,
-    href: "/docs/security-best-practices", // This should match: docs/05_Development Guide/security-best-practices.md
+    href: "/docs/gcp-5.7/05_Development Guide/security-best-practices",
     color: "bg-cyan-500",
   },
   {
-    title: "GCP Features In-Depth",
+    title: "GCP Features Indepth",
     description: "Deep dive into GRA Core Platform Features and Implementations.",
     icon: Database,
-    href: "/docs/cloud-functions", // This should match: docs/06_GCP Feature InDepth/cloud-functions.md
+    href: "/docs/gcp-5.7/06_GCP Feature InDepth/cloud-functions",
     color: "bg-indigo-500",
   },
 ]
 
 const seeAlsoLinks = [
-  { title: "Getting Started", href: "/docs/getting-started" },
-  { title: "API Reference", href: "/docs/api" },
-  { title: "Changelog", href: "/docs/changelog" },
+  { title: "Getting Started", href: "/docs/gcp-5.7/02_User Guide/Local_setup/getting-started" },
+  { title: "API Reference", href: "/docs/gcp-5.7/03_API Reference/api-reference" },
+  { title: "Changelog", href: "/docs/gcp-5.7/changelog" },
 ]
 
 export default function HomePage() {
@@ -124,7 +124,7 @@ export default function HomePage() {
               size="lg"
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
-              <Link href="/docs/quick-start">
+              <Link href="/docs/gcp-5.7/02_User Guide/Local_setup/getting-started">
                 Quick Start Guide
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Link>
