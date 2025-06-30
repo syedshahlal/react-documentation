@@ -3,9 +3,9 @@
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Search, Menu } from "lucide-react"
 import Link from "next/link"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 function ThemeToggleButton() {
   const { theme, setTheme } = useTheme()
@@ -107,6 +107,21 @@ function ThemeToggleButton() {
 }
 
 export function Header() {
+  const [versions, setVersions] = useState<Array<{ id: string; label: string; value: string }>>([])
+  const [currentVersion, setCurrentVersion] = useState<string>("")
+
+  useEffect(() => {
+    // Fetch available versions
+    fetch("/api/versions")
+      .then((res) => res.json())
+      .then((data) => {
+        setVersions(data)
+        if (data.length > 0) {
+          setCurrentVersion(data[0].value) // Set first version as default
+        }
+      })
+      .catch(console.error)
+  }, [])
   return (
     <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 left-0 right-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -143,9 +158,18 @@ export function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-              v5.7 stable
-            </Badge>
+            <Select value={currentVersion} onValueChange={setCurrentVersion}>
+              <SelectTrigger className="w-32 h-8 bg-purple-100 text-purple-700 border-purple-200 text-sm">
+                <SelectValue placeholder="Version" />
+              </SelectTrigger>
+              <SelectContent>
+                {versions.map((version) => (
+                  <SelectItem key={version.id} value={version.value}>
+                    {version.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {/* Theme Toggle Pill Button */}
             <ThemeToggleButton />
