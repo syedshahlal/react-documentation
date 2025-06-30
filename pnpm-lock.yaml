@@ -105,7 +105,7 @@ importers:
         specifier: latest
         version: 0.0.1-security
       gray-matter:
-        specifier: ^4.0.3
+        specifier: latest
         version: 4.0.3
       input-otp:
         specifier: latest
