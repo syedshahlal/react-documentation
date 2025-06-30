@@ -7,52 +7,48 @@ import Link from "next/link"
 import { Banner } from "@/components/banner"
 import { Header } from "@/components/header"
 
-const featureCards = [
+const documentationSections = [
   {
-    title: "Cloud-Native Architecture",
-    description:
-      "Built on modern cloud infrastructure with auto-scaling, high availability, and enterprise-grade security.",
-    icon: Layers,
-    color: "bg-blue-500",
-    features: ["Auto-scaling", "99.9% Uptime", "Enterprise Security"],
-  },
-  {
-    title: "Developer Experience",
-    description:
-      "Intuitive APIs, comprehensive SDKs, and powerful developer tools to accelerate your development workflow.",
-    icon: Code,
-    color: "bg-green-500",
-    features: ["RESTful APIs", "Multiple SDKs", "CLI Tools"],
-  },
-  {
-    title: "Real-time Analytics",
-    description:
-      "Advanced analytics and monitoring with real-time insights, custom dashboards, and intelligent alerts.",
-    icon: Database,
-    color: "bg-purple-500",
-    features: ["Live Dashboards", "Custom Metrics", "Smart Alerts"],
-  },
-  {
-    title: "Team Collaboration",
-    description:
-      "Built-in collaboration tools with role-based access control, team workspaces, and project management.",
-    icon: Users,
-    color: "bg-orange-500",
-    features: ["Role Management", "Team Workspaces", "Project Tracking"],
-  },
-  {
-    title: "Integration Hub",
-    description: "Seamlessly connect with popular tools and services through our extensive integration marketplace.",
-    icon: Wrench,
-    color: "bg-cyan-500",
-    features: ["200+ Integrations", "Custom Webhooks", "API Gateway"],
-  },
-  {
-    title: "Enterprise Ready",
-    description: "Enterprise-grade features including SSO, compliance certifications, and dedicated support.",
+    title: "GRA Core Platform Introduction",
+    description: "Get started with GRA Core Platform fundamentals and core concepts.",
     icon: Book,
+    href: "/docs/introduction", // This should match your actual file: docs/01_GRA_Core_Platform Introduction/introduction.md
+    color: "bg-blue-500",
+  },
+  {
+    title: "User Guide",
+    description: "Complete guide to using GRA Core Platform with step-by-step instructions.",
+    icon: Users,
+    href: "/docs/user-guide", // This should match: docs/02_User Guide/user-guide.md
+    color: "bg-green-500",
+  },
+  {
+    title: "API Reference",
+    description: "Comprehensive API documentation with examples and authentication guides.",
+    icon: Code,
+    href: "/docs/api-reference", // This should match: docs/03_API Reference/api-reference.md
+    color: "bg-purple-500",
+  },
+  {
+    title: "Examples & Tutorials",
+    description: "Real-world examples and step-by-step tutorials for common use cases.",
+    icon: Layers,
+    href: "/docs/basic-setup", // This should match: docs/04_Examples & Tutorials/basic-setup.md
+    color: "bg-orange-500",
+  },
+  {
+    title: "Development Guide",
+    description: "Development workflows, contribution guidelines, and advanced topics.",
+    icon: Wrench,
+    href: "/docs/security-best-practices", // This should match: docs/05_Development Guide/security-best-practices.md
+    color: "bg-cyan-500",
+  },
+  {
+    title: "GCP Features In-Depth",
+    description: "Deep dive into GRA Core Platform Features and Implementations.",
+    icon: Database,
+    href: "/docs/cloud-functions", // This should match: docs/06_GCP Feature InDepth/cloud-functions.md
     color: "bg-indigo-500",
-    features: ["SSO Integration", "SOC 2 Compliant", "24/7 Support"],
   },
 ]
 
@@ -85,41 +81,33 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Feature Cards */}
+        {/* Documentation Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-          {featureCards.map((feature, index) => {
-            const IconComponent = feature.icon
+          {documentationSections.map((section, index) => {
+            const IconComponent = section.icon
             return (
-              <Card
-                key={index}
-                className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm"
-              >
-                <CardHeader className="pb-4">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div
-                      className={`w-12 h-12 ${feature.color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}
-                    >
-                      <IconComponent className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    {feature.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
-                    {feature.description}
-                  </CardDescription>
-                  <div className="space-y-2">
-                    {feature.features.map((item, idx) => (
-                      <div key={idx} className="flex items-center text-sm text-slate-500 dark:text-slate-400">
-                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></div>
-                        {item}
+              <Link key={index} href={section.href}>
+                <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div
+                        className={`w-12 h-12 ${section.color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}
+                      >
+                        <IconComponent className="w-6 h-6 text-white" />
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-1 transition-all duration-300" />
+                    </div>
+                    <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {section.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {section.description}
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+              </Link>
             )
           })}
         </div>

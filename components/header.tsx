@@ -3,9 +3,9 @@
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Search, Menu } from "lucide-react"
 import Link from "next/link"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 function ThemeToggleButton() {
   const { theme, setTheme } = useTheme()
@@ -107,39 +107,6 @@ function ThemeToggleButton() {
 }
 
 export function Header() {
-  const [versions, setVersions] = useState<Array<{ id: string; label: string; value: string }>>([])
-  const [currentVersion, setCurrentVersion] = useState<string>("")
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    // Fetch available versions from docs/ directory
-    const fetchVersions = async () => {
-      try {
-        const response = await fetch("/api/versions")
-        const data = await response.json()
-
-        if (Array.isArray(data)) {
-          setVersions(data)
-          if (data.length > 0) {
-            setCurrentVersion(data[0].value) // Set first version as default
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching versions:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchVersions()
-  }, [])
-
-  const handleVersionChange = (version: string) => {
-    setCurrentVersion(version)
-    // You can add navigation logic here if needed
-    // For example: router.push(`/docs/${version}`)
-  }
-
   return (
     <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 left-0 right-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -176,27 +143,9 @@ export function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Version Dropdown */}
-            {loading ? (
-              <div className="w-32 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-md animate-pulse" />
-            ) : versions.length > 0 ? (
-              <Select value={currentVersion} onValueChange={handleVersionChange}>
-                <SelectTrigger className="w-32 h-8 bg-purple-100 text-purple-700 border-purple-200 text-sm hover:bg-purple-200 transition-colors">
-                  <SelectValue placeholder="Version" />
-                </SelectTrigger>
-                <SelectContent>
-                  {versions.map((version) => (
-                    <SelectItem key={version.id} value={version.value}>
-                      {version.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="w-32 h-8 bg-gray-100 dark:bg-gray-800 rounded-md flex items-center justify-center">
-                <span className="text-xs text-gray-500">No versions</span>
-              </div>
-            )}
+            <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+              v5.7 stable
+            </Badge>
 
             {/* Theme Toggle Pill Button */}
             <ThemeToggleButton />
