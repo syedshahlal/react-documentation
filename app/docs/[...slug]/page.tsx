@@ -45,18 +45,19 @@ const getDocContent = async (slug: string[]): Promise<DocData | null> => {
   try {
     await navigationService.initialize()
 
-    const slugPath = path.join(...slug) // e.g.  gcp-5.7/01_GRA_Core_Platform Introduction/introduction
+    const slugPath = path.join(...slug)
     const baseDocs = path.join(process.cwd(), "docs")
+    const variants: string[] = []
 
-    // 1. Variants WITHOUT extra prefix
-    const variants = [
+    // ─── ❶  Try the exact slug path first ──────────────────────────────────────────
+    variants.push(
       path.join(baseDocs, `${slugPath}.md`),
       path.join(baseDocs, `${slugPath}.mdx`),
       path.join(baseDocs, slugPath, "index.md"),
       path.join(baseDocs, slugPath, "index.mdx"),
-    ]
+    )
 
-    // 2. If slugPath doesn't already start with gcp-5.7, also try with that prefix
+    // ─── ❷  If slug *doesn’t* start with "gcp-5.7", also try prefixed versions ────
     if (!slug[0]?.startsWith("gcp-5.7")) {
       const prefixed = path.join(baseDocs, "gcp-5.7", slugPath)
       variants.push(
@@ -67,7 +68,18 @@ const getDocContent = async (slug: string[]): Promise<DocData | null> => {
       )
     }
 
-    // 3. Variant from navigation service (if configured)
+    // ─── ❸  If slug *does* start with "gcp-5.7", also try WITHOUT that prefix ─────
+    if (slug[0] === "gcp-5.7") {
+      const withoutPrefixPath = path.join(...slug.slice(1))
+      variants.push(
+        path.join(baseDocs, `${withoutPrefixPath}.md`),
+        path.join(baseDocs, `${withoutPrefixPath}.mdx`),
+        path.join(baseDocs, withoutPrefixPath, "index.md"),
+        path.join(baseDocs, withoutPrefixPath, "index.mdx"),
+      )
+    }
+
+    // ─── ❹  Variant from navigation-config (highest priority) ──────────────────────
     const navItem = navigationService.findItemBySlug(slugPath)
     if (navItem?.filePath) {
       variants.unshift(path.join(process.cwd(), navItem.filePath))
