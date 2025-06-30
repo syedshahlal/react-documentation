@@ -1,4 +1,4 @@
-import { promises as fs } from "fs"
+import fs from "fs/promises"
 import path from "path"
 import matter from "gray-matter"
 import { type NavigationConfig, type NavigationItem, defaultNavigationConfig } from "./navigation-config"
@@ -40,131 +40,90 @@ export interface ProcessedDocument {
 }
 
 export class NavigationService {
-  private config: NavigationConfig
-  private documentsCache: Map<string, ProcessedDocument> = new Map()
-  private configPath: string
+  private config: NavigationConfig = defaultNavigationConfig
+  private documentsCache: Map<string, any> = new Map()
+  private navigationCache: NavigationItem[] = []
+  private initialized = false
 
-  constructor(configPath?: string) {
-    this.configPath = configPath || path.join(process.cwd(), "navigation.config.json")
-    this.config = defaultNavigationConfig
-  }
+  async initialize() {
+    if (this.initialized) return
 
-  async initialize(): Promise<void> {
-    await this.loadConfig()
-    await this.refreshDocuments()
-  }
-
-  async loadConfig(): Promise<NavigationConfig> {
     try {
-      const configExists = await fs
-        .access(this.configPath)
-        .then(() => true)
-        .catch(() => false)
-
-      if (configExists) {
-        const configContent = await fs.readFile(this.configPath, "utf-8")
-        this.config = { ...defaultNavigationConfig, ...JSON.parse(configContent) }
-      } else {
-        await this.saveConfig()
+      // Try to load custom navigation config
+      const configPath = path.join(process.cwd(), "navigation.config.json")
+      try {
+        const configFile = await fs.readFile(configPath, "utf8")
+        this.config = { ...defaultNavigationConfig, ...JSON.parse(configFile) }
+      } catch {
+        // Use default config if file doesn't exist
+        console.log("Using default navigation configuration")
       }
-    } catch (error) {
-      console.error("Error loading navigation config:", error)
-      this.config = defaultNavigationConfig
-    }
 
-    return this.config
+      // Scan and process documents
+      await this.scanDocuments()
+      this.initialized = true
+    } catch (error) {
+      console.error("Failed to initialize NavigationService:", error)
+      throw error
+    }
   }
 
-  async saveConfig(): Promise<void> {
+  private async scanDocuments() {
+    const docsPath = path.join(process.cwd(), "docs")
+
     try {
-      await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2))
+      await this.scanDirectory(docsPath, "")
     } catch (error) {
-      console.error("Error saving navigation config:", error)
+      console.error("Error scanning documents:", error)
     }
   }
 
-  async updateConfig(updates: Partial<NavigationConfig>): Promise<NavigationConfig> {
-    this.config = { ...this.config, ...updates }
-    await this.saveConfig()
-    return this.config
-  }
+  private async scanDirectory(dirPath: string, relativePath: string) {
+    try {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true })
 
-  getConfig(): NavigationConfig {
-    return this.config
-  }
+      for (const entry of entries) {
+        const fullPath = path.join(dirPath, entry.name)
+        const entryRelativePath = path.join(relativePath, entry.name)
 
-  async refreshDocuments(): Promise<void> {
-    this.documentsCache.clear()
-    await this.processNavigationItems(this.config.navigation)
-  }
-
-  private async processNavigationItems(items: NavigationItem[]): Promise<void> {
-    for (const item of items) {
-      if (item.type === "file" && item.filePath) {
-        try {
-          const doc = await this.processDocument(item.filePath, item.href || "", item.id)
-          this.documentsCache.set(item.id, doc)
-        } catch (error) {
-          console.error(`Error processing document ${item.filePath}:`, error)
+        if (entry.isDirectory()) {
+          await this.scanDirectory(fullPath, entryRelativePath)
+        } else if (entry.isFile() && (entry.name.endsWith(".md") || entry.name.endsWith(".mdx"))) {
+          await this.processDocument(fullPath, entryRelativePath)
         }
       }
+    } catch (error) {
+      console.error(`Error scanning directory ${dirPath}:`, error)
+    }
+  }
 
-      if (item.children) {
-        await this.processNavigationItems(item.children)
+  private async processDocument(filePath: string, relativePath: string) {
+    try {
+      const content = await fs.readFile(filePath, "utf8")
+      const { data: frontmatter, content: markdownContent } = matter(content)
+
+      // Calculate metadata
+      const wordCount = markdownContent.split(/\s+/).length
+      const estimatedReadTime = Math.ceil(wordCount / 200)
+
+      // Extract headings for table of contents
+      const headings = this.extractHeadings(markdownContent)
+
+      const documentData = {
+        filePath: relativePath,
+        fullPath: filePath,
+        frontmatter,
+        content: markdownContent,
+        wordCount,
+        estimatedReadTime,
+        headings,
+        lastModified: (await fs.stat(filePath)).mtime,
       }
+
+      this.documentsCache.set(relativePath, documentData)
+    } catch (error) {
+      console.error(`Error processing document ${filePath}:`, error)
     }
-  }
-
-  private async processDocument(filePath: string, href: string, id: string): Promise<ProcessedDocument> {
-    const fullPath = path.join(process.cwd(), filePath)
-    const fileContent = await fs.readFile(fullPath, "utf-8")
-    const { data: frontmatter, content } = matter(fileContent)
-    const stats = await fs.stat(fullPath)
-
-    // Extract headings
-    const headings = this.extractHeadings(content)
-
-    // Extract links
-    const links = this.extractLinks(content)
-
-    // Calculate word count
-    const wordCount = content.split(/\s+/).length
-
-    // Calculate estimated read time (average 200 words per minute)
-    const estimatedReadTime = Math.ceil(wordCount / 200)
-
-    const metadata: DocumentMetadata = {
-      title: frontmatter.title || this.extractTitleFromContent(content),
-      description: frontmatter.description,
-      tags: frontmatter.tags || [],
-      category: frontmatter.category,
-      difficulty: frontmatter.difficulty,
-      estimatedReadTime: frontmatter.estimatedReadTime || estimatedReadTime,
-      lastUpdated: frontmatter.lastUpdated || stats.mtime.toISOString(),
-      author: frontmatter.author,
-      version: frontmatter.version,
-      relatedDocs: frontmatter.relatedDocs || [],
-      prerequisites: frontmatter.prerequisites || [],
-      nextSteps: frontmatter.nextSteps || [],
-    }
-
-    return {
-      id,
-      title: metadata.title || "Untitled",
-      content,
-      metadata,
-      filePath,
-      href,
-      lastModified: stats.mtime,
-      wordCount,
-      headings,
-      links,
-    }
-  }
-
-  private extractTitleFromContent(content: string): string {
-    const titleMatch = content.match(/^#\s+(.+)$/m)
-    return titleMatch ? titleMatch[1].trim() : "Untitled"
   }
 
   private extractHeadings(content: string): Array<{ level: number; text: string; id: string }> {
@@ -177,8 +136,8 @@ export class NavigationService {
       const text = match[2].trim()
       const id = text
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "")
+        .replace(/[^\w\s-]/g, "")
+        .replace(/\s+/g, "-")
 
       headings.push({ level, text, id })
     }
@@ -186,245 +145,74 @@ export class NavigationService {
     return headings
   }
 
-  private extractLinks(content: string): Array<{ type: "internal" | "external"; href: string; text: string }> {
-    const linkRegex = /\[([^\]]+)\]$$([^)]+)$$/g
-    const links: Array<{ type: "internal" | "external"; href: string; text: string }> = []
-    let match
-
-    while ((match = linkRegex.exec(content)) !== null) {
-      const text = match[1]
-      const href = match[2]
-      const type = href.startsWith("http") || href.startsWith("//") ? "external" : "internal"
-
-      links.push({ type, href, text })
-    }
-
-    return links
-  }
-
   getNavigation(): NavigationItem[] {
     return this.config.navigation
   }
 
-  getDocument(id: string): ProcessedDocument | undefined {
-    return this.documentsCache.get(id)
-  }
+  findItemBySlug(slug: string): NavigationItem | null {
+    const findInItems = (items: NavigationItem[]): NavigationItem | null => {
+      for (const item of items) {
+        // Check if this item matches the slug
+        if (item.href === `/docs/${slug}` || item.id === slug) {
+          return item
+        }
 
-  getAllDocuments(): ProcessedDocument[] {
-    return Array.from(this.documentsCache.values())
-  }
-
-  searchDocuments(
-    query: string,
-    filters?: {
-      tags?: string[]
-      category?: string
-      difficulty?: string
-    },
-  ): ProcessedDocument[] {
-    const queryLower = query.toLowerCase()
-    let results = Array.from(this.documentsCache.values())
-
-    // Text search
-    if (query) {
-      results = results.filter(
-        (doc) =>
-          doc.title.toLowerCase().includes(queryLower) ||
-          doc.content.toLowerCase().includes(queryLower) ||
-          doc.metadata.description?.toLowerCase().includes(queryLower) ||
-          doc.metadata.tags?.some((tag) => tag.toLowerCase().includes(queryLower)),
-      )
+        // Check children recursively
+        if (item.children) {
+          const found = findInItems(item.children)
+          if (found) return found
+        }
+      }
+      return null
     }
 
-    // Apply filters
-    if (filters) {
-      if (filters.tags && filters.tags.length > 0) {
-        results = results.filter((doc) => filters.tags!.some((tag) => doc.metadata.tags?.includes(tag)))
+    return findInItems(this.config.navigation)
+  }
+
+  getFlatNavigationItems(): NavigationItem[] {
+    const flattenItems = (items: NavigationItem[]): NavigationItem[] => {
+      const result: NavigationItem[] = []
+
+      for (const item of items) {
+        if (item.type === "file") {
+          result.push(item)
+        }
+
+        if (item.children) {
+          result.push(...flattenItems(item.children))
+        }
       }
 
-      if (filters.category) {
-        results = results.filter((doc) => doc.metadata.category === filters.category)
-      }
-
-      if (filters.difficulty) {
-        results = results.filter((doc) => doc.metadata.difficulty === filters.difficulty)
-      }
+      return result
     }
 
-    // Sort by relevance
-    return results.sort((a, b) => {
-      const aScore = this.calculateRelevanceScore(a, queryLower)
-      const bScore = this.calculateRelevanceScore(b, queryLower)
-      return bScore - aScore
-    })
+    return flattenItems(this.config.navigation)
   }
 
-  private calculateRelevanceScore(doc: ProcessedDocument, query: string): number {
-    let score = 0
+  generateBreadcrumbs(slug: string): Array<{ title: string; href: string }> {
+    const breadcrumbs: Array<{ title: string; href: string }> = []
+    const parts = slug.split("/")
 
-    // Title match (highest weight)
-    if (doc.title.toLowerCase().includes(query)) {
-      score += 10
-    }
+    // Add home
+    breadcrumbs.push({ title: "Documentation", href: "/docs" })
 
-    // Description match
-    if (doc.metadata.description?.toLowerCase().includes(query)) {
-      score += 5
-    }
+    // Build breadcrumbs from slug parts
+    let currentPath = ""
+    for (const part of parts) {
+      currentPath += (currentPath ? "/" : "") + part
+      const item = this.findItemBySlug(currentPath)
 
-    // Tag match
-    if (doc.metadata.tags?.some((tag) => tag.toLowerCase().includes(query))) {
-      score += 3
-    }
-
-    // Content match (lowest weight)
-    const contentMatches = (doc.content.toLowerCase().match(new RegExp(query, "g")) || []).length
-    score += contentMatches * 0.1
-
-    return score
-  }
-
-  getRelatedDocuments(documentId: string, limit = 5): ProcessedDocument[] {
-    const doc = this.documentsCache.get(documentId)
-    if (!doc) return []
-
-    const allDocs = Array.from(this.documentsCache.values()).filter((d) => d.id !== documentId)
-
-    // Calculate similarity based on tags and category
-    const scored = allDocs.map((otherDoc) => ({
-      doc: otherDoc,
-      score: this.calculateSimilarityScore(doc, otherDoc),
-    }))
-
-    return scored
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((item) => item.doc)
-  }
-
-  private calculateSimilarityScore(doc1: ProcessedDocument, doc2: ProcessedDocument): number {
-    let score = 0
-
-    // Same category
-    if (doc1.metadata.category && doc1.metadata.category === doc2.metadata.category) {
-      score += 5
-    }
-
-    // Common tags
-    const commonTags = doc1.metadata.tags?.filter((tag) => doc2.metadata.tags?.includes(tag)) || []
-    score += commonTags.length * 2
-
-    // Same difficulty level
-    if (doc1.metadata.difficulty && doc1.metadata.difficulty === doc2.metadata.difficulty) {
-      score += 1
-    }
-
-    return score
-  }
-
-  async addNavigationItem(parentId: string | null, item: Omit<NavigationItem, "id">): Promise<NavigationItem> {
-    const newItem: NavigationItem = {
-      ...item,
-      id: this.generateId(item.title),
-    }
-
-    if (parentId) {
-      const parent = this.findNavigationItem(parentId)
-      if (parent) {
-        if (!parent.children) parent.children = []
-        parent.children.push(newItem)
-      }
-    } else {
-      this.config.navigation.push(newItem)
-    }
-
-    await this.saveConfig()
-
-    if (newItem.type === "file" && newItem.filePath) {
-      try {
-        const doc = await this.processDocument(newItem.filePath, newItem.href || "", newItem.id)
-        this.documentsCache.set(newItem.id, doc)
-      } catch (error) {
-        console.error(`Error processing new document ${newItem.filePath}:`, error)
-      }
-    }
-
-    return newItem
-  }
-
-  async updateNavigationItem(id: string, updates: Partial<NavigationItem>): Promise<NavigationItem | null> {
-    const item = this.findNavigationItem(id)
-    if (!item) return null
-
-    Object.assign(item, updates)
-    await this.saveConfig()
-
-    if (item.type === "file" && item.filePath) {
-      try {
-        const doc = await this.processDocument(item.filePath, item.href || "", item.id)
-        this.documentsCache.set(item.id, doc)
-      } catch (error) {
-        console.error(`Error reprocessing document ${item.filePath}:`, error)
-      }
-    }
-
-    return item
-  }
-
-  async removeNavigationItem(id: string): Promise<boolean> {
-    const removed = this.removeNavigationItemRecursive(this.config.navigation, id)
-    if (removed) {
-      await this.saveConfig()
-      this.documentsCache.delete(id)
-    }
-    return removed
-  }
-
-  private removeNavigationItemRecursive(items: NavigationItem[], id: string): boolean {
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].id === id) {
-        items.splice(i, 1)
-        return true
-      }
-
-      if (items[i].children && this.removeNavigationItemRecursive(items[i].children!, id)) {
-        return true
-      }
-    }
-    return false
-  }
-
-  private findNavigationItem(id: string): NavigationItem | null {
-    return this.findNavigationItemRecursive(this.config.navigation, id)
-  }
-
-  private findNavigationItemRecursive(items: NavigationItem[], id: string): NavigationItem | null {
-    for (const item of items) {
-      if (item.id === id) return item
-      if (item.children) {
-        const found = this.findNavigationItemRecursive(item.children, id)
-        if (found) return found
-      }
-    }
-    return null
-  }
-
-  private generateId(title: string): string {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-  }
-
-  getBreadcrumbs(documentId: string): Array<{ title: string; href?: string }> {
-    const breadcrumbs: Array<{ title: string; href?: string }> = []
-    const path = this.findNavigationPath(this.config.navigation, documentId, [])
-
-    if (path) {
-      for (const item of path) {
+      if (item) {
         breadcrumbs.push({
           title: item.title,
-          href: item.href,
+          href: item.href || `/docs/${currentPath}`,
+        })
+      } else {
+        // Fallback: create breadcrumb from slug part
+        const title = part.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+        breadcrumbs.push({
+          title,
+          href: `/docs/${currentPath}`,
         })
       }
     }
@@ -432,75 +220,119 @@ export class NavigationService {
     return breadcrumbs
   }
 
-  private findNavigationPath(
-    items: NavigationItem[],
-    targetId: string,
-    currentPath: NavigationItem[],
-  ): NavigationItem[] | null {
-    for (const item of items) {
-      const newPath = [...currentPath, item]
+  searchDocuments(
+    query: string,
+    filters?: {
+      tags?: string[]
+      difficulty?: string
+      category?: string
+    },
+  ) {
+    const results: any[] = []
 
-      if (item.id === targetId) {
-        return newPath
+    for (const [relativePath, doc] of this.documentsCache.entries()) {
+      let score = 0
+
+      // Search in title
+      if (doc.frontmatter.title?.toLowerCase().includes(query.toLowerCase())) {
+        score += 10
       }
 
-      if (item.children) {
-        const found = this.findNavigationPath(item.children, targetId, newPath)
-        if (found) return found
+      // Search in content
+      if (doc.content.toLowerCase().includes(query.toLowerCase())) {
+        score += 5
+      }
+
+      // Search in tags
+      if (doc.frontmatter.tags?.some((tag: string) => tag.toLowerCase().includes(query.toLowerCase()))) {
+        score += 3
+      }
+
+      // Apply filters
+      if (filters?.tags && !filters.tags.some((tag) => doc.frontmatter.tags?.includes(tag))) {
+        continue
+      }
+
+      if (filters?.difficulty && doc.frontmatter.difficulty !== filters.difficulty) {
+        continue
+      }
+
+      if (score > 0) {
+        results.push({
+          ...doc,
+          relativePath,
+          score,
+        })
       }
     }
-    return null
+
+    return results.sort((a, b) => b.score - a.score)
   }
 
-  getNavigationStats(): {
-    totalDocuments: number
-    totalFolders: number
-    documentsByDifficulty: Record<string, number>
-    documentsByCategory: Record<string, number>
-    averageReadTime: number
-  } {
-    const docs = this.getAllDocuments()
+  getRelatedDocuments(documentPath: string, limit = 5) {
+    const currentDoc = this.documentsCache.get(documentPath)
+    if (!currentDoc) return []
+
+    const related: any[] = []
+
+    for (const [relativePath, doc] of this.documentsCache.entries()) {
+      if (relativePath === documentPath) continue
+
+      let similarity = 0
+
+      // Check tag overlap
+      const currentTags = currentDoc.frontmatter.tags || []
+      const docTags = doc.frontmatter.tags || []
+      const tagOverlap = currentTags.filter((tag: string) => docTags.includes(tag)).length
+      similarity += tagOverlap * 2
+
+      // Check category similarity
+      if (currentDoc.frontmatter.category === doc.frontmatter.category) {
+        similarity += 3
+      }
+
+      // Check difficulty similarity
+      if (currentDoc.frontmatter.difficulty === doc.frontmatter.difficulty) {
+        similarity += 1
+      }
+
+      if (similarity > 0) {
+        related.push({
+          ...doc,
+          relativePath,
+          similarity,
+        })
+      }
+    }
+
+    return related.sort((a, b) => b.similarity - a.similarity).slice(0, limit)
+  }
+
+  getDocumentStats() {
     const stats = {
-      totalDocuments: docs.length,
-      totalFolders: this.countFolders(this.config.navigation),
-      documentsByDifficulty: {} as Record<string, number>,
-      documentsByCategory: {} as Record<string, number>,
+      totalDocuments: this.documentsCache.size,
+      totalWords: 0,
       averageReadTime: 0,
+      difficulties: { beginner: 0, intermediate: 0, advanced: 0 },
+      tags: new Map<string, number>(),
     }
 
-    let totalReadTime = 0
+    for (const doc of this.documentsCache.values()) {
+      stats.totalWords += doc.wordCount
 
-    for (const doc of docs) {
-      if (doc.metadata.difficulty) {
-        stats.documentsByDifficulty[doc.metadata.difficulty] =
-          (stats.documentsByDifficulty[doc.metadata.difficulty] || 0) + 1
+      const difficulty = doc.frontmatter.difficulty || "beginner"
+      if (difficulty in stats.difficulties) {
+        stats.difficulties[difficulty as keyof typeof stats.difficulties]++
       }
 
-      if (doc.metadata.category) {
-        stats.documentsByCategory[doc.metadata.category] = (stats.documentsByCategory[doc.metadata.category] || 0) + 1
+      const tags = doc.frontmatter.tags || []
+      for (const tag of tags) {
+        stats.tags.set(tag, (stats.tags.get(tag) || 0) + 1)
       }
-
-      totalReadTime += doc.metadata.estimatedReadTime || 0
     }
 
-    stats.averageReadTime = docs.length > 0 ? Math.round(totalReadTime / docs.length) : 0
+    stats.averageReadTime = Math.ceil(stats.totalWords / 200 / stats.totalDocuments)
 
     return stats
   }
-
-  private countFolders(items: NavigationItem[]): number {
-    let count = 0
-    for (const item of items) {
-      if (item.type === "folder") {
-        count++
-        if (item.children) {
-          count += this.countFolders(item.children)
-        }
-      }
-    }
-    return count
-  }
 }
-
-// Singleton instance
-export const navigationService = new NavigationService()

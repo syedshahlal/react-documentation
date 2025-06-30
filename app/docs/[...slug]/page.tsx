@@ -1,10 +1,32 @@
 import { notFound } from "next/navigation"
+import { promises as fs } from "fs"
+import path from "path"
+import matter from "gray-matter"
 import { Sidebar } from "@/components/sidebar"
 import { DocContent } from "@/components/doc-content"
 import { Breadcrumb } from "@/components/breadcrumb"
 import { PageNavigation } from "@/components/page-navigation"
 import { TableOfContents } from "@/components/table-of-contents"
 import { Header } from "@/components/header"
+import { NavigationService } from "@/lib/navigation-service"
+
+interface DocMetadata {
+  title: string
+  description?: string
+  author?: string
+  lastUpdated?: string
+  tags?: string[]
+  difficulty?: "beginner" | "intermediate" | "advanced"
+  estimatedReadTime?: number
+  [key: string]: any
+}
+
+interface DocData {
+  title: string
+  content: string
+  lastUpdated: string
+  metadata: DocMetadata
+}
 
 // Navigation structure for determining next/previous pages
 const navigationOrder = [
@@ -16,337 +38,154 @@ const navigationOrder = [
   { slug: "architecture", title: "Platform Architecture" },
 ]
 
-// This would typically come from your markdown files
-const getDocContent = async (slug: string[]) => {
-  const slugPath = slug.join("/")
+// Initialize navigation service
+const navigationService = new NavigationService()
 
-  // Mock content - in a real app, you'd read from markdown files
-  const mockContent = {
-    introduction: {
-      title: "Introduction to GRA Core Platform",
-      content: `# Introduction to GRA Core Platform
+const getDocContent = async (slug: string[]): Promise<DocData | null> => {
+  try {
+    // Initialize navigation service if not already done
+    await navigationService.initialize()
 
-Welcome to the GRA Core Platform documentation. This comprehensive guide will help you understand and implement our enterprise-grade platform.
+    // Try different possible file paths
+    const possiblePaths = [
+      // Direct path with gcp-5.7 prefix
+      path.join(process.cwd(), "docs", "gcp-5.7", ...slug) + ".md",
+      // Path without gcp-5.7 prefix
+      path.join(process.cwd(), "docs", ...slug) + ".md",
+      // Try with different file extensions
+      path.join(process.cwd(), "docs", "gcp-5.7", ...slug) + ".mdx",
+      // Try finding in subdirectories
+      path.join(process.cwd(), "docs", "gcp-5.7", slug.join("/"), "index.md"),
+    ]
 
-## What is GRA Core Platform?
-
-GRA Core Platform is a powerful, scalable solution designed for modern enterprises. It provides:
-
-- **High Performance**: Built for scale with enterprise-grade performance
-- **Security First**: Advanced security features and compliance standards
-- **Developer Friendly**: Intuitive APIs and comprehensive documentation
-- **Flexible Architecture**: Modular design that adapts to your needs
-
-## Getting Started
-
-To begin using GRA Core Platform, you'll need to:
-
-1. Set up your development environment
-2. Configure your API credentials
-3. Install the required dependencies
-4. Run your first example
-
-## Key Features
-
-### Authentication & Authorization
-Secure authentication system with role-based access control.
-
-### Real-time Data Processing
-Process and analyze data in real-time with our streaming architecture.
-
-### Scalable Infrastructure
-Auto-scaling capabilities that grow with your business needs.
-
-## Next Steps
-
-Ready to dive deeper? Check out our [User Guide](/docs/user-guide) or explore our [API Reference](/docs/api-reference).`,
-      lastUpdated: "2024-01-15",
-    },
-    "user-guide": {
-      title: "User Guide",
-      content: `# User Guide
-
-This comprehensive user guide will walk you through all aspects of using GRA Core Platform.
-
-## Table of Contents
-
-1. [Getting Started](#getting-started)
-2. [Basic Operations](#basic-operations)
-3. [Advanced Features](#advanced-features)
-4. [Troubleshooting](#troubleshooting)
-
-## Getting Started
-
-### Prerequisites
-
-Before you begin, ensure you have:
-
-- Node.js 18+ installed
-- A valid GRA Core Platform account
-- API credentials configured
-
-### Installation
-
-\`\`\`bash
-npm install @gra-core/platform
-\`\`\`
-
-### Basic Configuration
-
-\`\`\`javascript
-import { GRACore } from '@gra-core/platform'
-
-const client = new GRACore({
-  apiKey: 'your-api-key',
-  environment: 'production'
-})
-\`\`\`
-
-## Basic Operations
-
-### Creating Resources
-
-Learn how to create and manage resources in the platform.
-
-### Data Management
-
-Understand how to efficiently manage your data with our APIs.
-
-### Monitoring & Analytics
-
-Set up monitoring and analytics for your applications.`,
-      lastUpdated: "2024-01-14",
-    },
-    "api-reference": {
-      title: "API Reference",
-      content: `# API Reference
-
-Complete reference for all GRA Core Platform APIs.
-
-## Authentication
-
-All API requests require authentication using API keys.
-
-### Headers
-
-\`\`\`
-Authorization: Bearer YOUR_API_KEY
-Content-Type: application/json
-\`\`\`
-
-## Endpoints
-
-### Users API
-
-#### GET /api/users
-
-Retrieve a list of users.
-
-**Parameters:**
-- \`limit\` (optional): Number of users to return (default: 10)
-- \`offset\` (optional): Number of users to skip (default: 0)
-
-**Response:**
-\`\`\`json
-{
-  "users": [
-    {
-      "id": "user_123",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "created_at": "2024-01-01T00:00:00Z"
+    // Also try to find the file using navigation service
+    const navigationItem = navigationService.findItemBySlug(slug.join("/"))
+    if (navigationItem?.filePath) {
+      possiblePaths.unshift(path.join(process.cwd(), navigationItem.filePath))
     }
-  ],
-  "total": 1,
-  "has_more": false
-}
-\`\`\`
 
-#### POST /api/users
+    let filePath: string | null = null
+    let fileContent = ""
 
-Create a new user.
+    // Try each possible path
+    for (const possiblePath of possiblePaths) {
+      try {
+        await fs.access(possiblePath)
+        filePath = possiblePath
+        fileContent = await fs.readFile(possiblePath, "utf8")
+        break
+      } catch {
+        // Continue to next path
+        continue
+      }
+    }
 
-**Request Body:**
-\`\`\`json
-{
-  "name": "Jane Doe",
-  "email": "jane@example.com"
-}
-\`\`\`
+    if (!filePath || !fileContent) {
+      console.log(`File not found for slug: ${slug.join("/")}, tried paths:`, possiblePaths)
+      return null
+    }
 
-### Data API
+    // Parse frontmatter and content
+    const { data: frontmatter, content } = matter(fileContent)
 
-#### GET /api/data
+    // Get file stats for last modified date
+    const stats = await fs.stat(filePath)
+    const lastUpdated = frontmatter.lastUpdated || stats.mtime.toISOString().split("T")[0]
 
-Retrieve data from the platform.
+    // Calculate estimated read time if not provided
+    const wordCount = content.split(/\s+/).length
+    const estimatedReadTime = frontmatter.estimatedReadTime || Math.ceil(wordCount / 200)
 
-#### POST /api/data
+    const docData: DocData = {
+      title: frontmatter.title || slug[slug.length - 1].replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+      content,
+      lastUpdated,
+      metadata: {
+        title: frontmatter.title,
+        description: frontmatter.description,
+        author: frontmatter.author,
+        lastUpdated,
+        tags: frontmatter.tags || [],
+        difficulty: frontmatter.difficulty || "beginner",
+        estimatedReadTime,
+        ...frontmatter,
+      },
+    }
 
-Submit new data to the platform.`,
-      lastUpdated: "2024-01-13",
-    },
-    examples: {
-      title: "Examples & Tutorials",
-      content: `# Examples & Tutorials
-
-Real-world examples and step-by-step tutorials for common use cases.
-
-## Quick Start Examples
-
-### Basic Setup
-
-\`\`\`javascript
-import { GRACore } from '@gra-core/platform'
-
-const client = new GRACore({
-  apiKey: process.env.GRA_API_KEY,
-  environment: 'production'
-})
-\`\`\`
-
-### Creating Your First Resource
-
-\`\`\`javascript
-const resource = await client.resources.create({
-  name: 'My First Resource',
-  type: 'data-source'
-})
-\`\`\`
-
-## Advanced Examples
-
-### Real-time Data Processing
-
-Learn how to process data in real-time with our streaming APIs.
-
-### Custom Integrations
-
-Build custom integrations with third-party services.`,
-      lastUpdated: "2024-01-12",
-    },
-    development: {
-      title: "Development Guide",
-      content: `# Development Guide
-
-Development workflows, contribution guidelines, and advanced topics.
-
-## Development Environment
-
-### Prerequisites
-
-- Node.js 18+
-- Docker
-- Git
-
-### Setup
-
-\`\`\`bash
-git clone https://github.com/gra-core/platform
-cd platform
-npm install
-npm run dev
-\`\`\`
-
-## Contributing
-
-### Code Style
-
-We use ESLint and Prettier for code formatting.
-
-### Testing
-
-Run tests with:
-
-\`\`\`bash
-npm test
-\`\`\`
-
-## Advanced Topics
-
-### Custom Plugins
-
-Learn how to create custom plugins for the platform.
-
-### Performance Optimization
-
-Best practices for optimizing your GRA Core applications.`,
-      lastUpdated: "2024-01-11",
-    },
-    architecture: {
-      title: "Platform Architecture",
-      content: `# Platform Architecture
-
-Deep dive into GRA Core Platform architecture and infrastructure.
-
-## System Overview
-
-The GRA Core Platform is built on a microservices architecture with the following components:
-
-- **API Gateway**: Routes requests and handles authentication
-- **Core Services**: Business logic and data processing
-- **Data Layer**: Distributed database and caching
-- **Message Queue**: Asynchronous processing and events
-
-## Scalability
-
-### Horizontal Scaling
-
-The platform automatically scales based on demand.
-
-### Load Balancing
-
-Traffic is distributed across multiple instances.
-
-## Security
-
-### Authentication
-
-Multi-factor authentication and OAuth 2.0 support.
-
-### Data Encryption
-
-All data is encrypted at rest and in transit.`,
-      lastUpdated: "2024-01-10",
-    },
+    return docData
+  } catch (error) {
+    console.error("Error reading document:", error)
+    return null
   }
-
-  return mockContent[slugPath] || null
 }
 
-const getPageNavigation = (currentSlug: string) => {
-  const currentIndex = navigationOrder.findIndex((item) => item.slug === currentSlug)
+const getPageNavigation = async (currentSlug: string[]) => {
+  try {
+    await navigationService.initialize()
+    const navigation = navigationService.getNavigation()
 
-  if (currentIndex === -1) return { previousPage: null, nextPage: null }
+    // Find current item and get navigation
+    const currentPath = currentSlug.join("/")
+    const currentItem = navigationService.findItemBySlug(currentPath)
 
-  const previousPage =
-    currentIndex > 0
-      ? {
-          title: navigationOrder[currentIndex - 1].title,
-          href: `/docs/${navigationOrder[currentIndex - 1].slug}`,
-        }
-      : null
+    if (!currentItem) {
+      return { previousPage: null, nextPage: null }
+    }
 
-  const nextPage =
-    currentIndex < navigationOrder.length - 1
-      ? {
-          title: navigationOrder[currentIndex + 1].title,
-          href: `/docs/${navigationOrder[currentIndex + 1].slug}`,
-        }
-      : null
+    // Get flat list of all navigable items
+    const flatItems = navigationService.getFlatNavigationItems()
+    const currentIndex = flatItems.findIndex((item) => item.id === currentItem.id)
 
-  return { previousPage, nextPage }
+    if (currentIndex === -1) {
+      return { previousPage: null, nextPage: null }
+    }
+
+    const previousItem = currentIndex > 0 ? flatItems[currentIndex - 1] : null
+    const nextItem = currentIndex < flatItems.length - 1 ? flatItems[currentIndex + 1] : null
+
+    return {
+      previousPage: previousItem
+        ? {
+            title: previousItem.title,
+            href: previousItem.href || `/docs/${previousItem.id}`,
+          }
+        : null,
+      nextPage: nextItem
+        ? {
+            title: nextItem.title,
+            href: nextItem.href || `/docs/${nextItem.id}`,
+          }
+        : null,
+    }
+  } catch (error) {
+    console.error("Error getting page navigation:", error)
+    return { previousPage: null, nextPage: null }
+  }
+}
+
+const generateBreadcrumbs = async (slug: string[]) => {
+  try {
+    await navigationService.initialize()
+    return navigationService.generateBreadcrumbs(slug.join("/"))
+  } catch (error) {
+    console.error("Error generating breadcrumbs:", error)
+    return []
+  }
 }
 
 export default async function DocPage({ params }: { params: Promise<{ slug: string[] }> }) {
   const { slug } = await params
+
+  // Get document content
   const doc = await getDocContent(slug)
 
   if (!doc) {
+    console.log(`Document not found for slug: ${slug.join("/")}`)
     notFound()
   }
 
-  const currentSlug = slug.join("/")
-  const { previousPage, nextPage } = getPageNavigation(currentSlug)
+  // Get navigation for previous/next pages
+  const { previousPage, nextPage } = await getPageNavigation(slug)
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
@@ -364,7 +203,12 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
             <Breadcrumb slug={slug} />
 
             <div className="mt-6">
-              <DocContent title={doc.title} content={doc.content} lastUpdated={doc.lastUpdated} />
+              <DocContent
+                title={doc.title}
+                content={doc.content}
+                lastUpdated={doc.lastUpdated}
+                metadata={doc.metadata}
+              />
 
               <PageNavigation previousPage={previousPage} nextPage={nextPage} />
             </div>
@@ -382,13 +226,44 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
   )
 }
 
+// Generate static params for known routes
 export async function generateStaticParams() {
-  return [
-    { slug: ["introduction"] },
-    { slug: ["user-guide"] },
-    { slug: ["api-reference"] },
-    { slug: ["examples"] },
-    { slug: ["development"] },
-    { slug: ["architecture"] },
-  ]
+  try {
+    const navigationService = new NavigationService()
+    await navigationService.initialize()
+
+    // Get all navigable items and generate params
+    const flatItems = navigationService.getFlatNavigationItems()
+    const params = flatItems
+      .filter((item) => item.type === "file" && item.href)
+      .map((item) => {
+        // Extract slug from href
+        const href = item.href!
+        const slug = href.replace("/docs/", "").split("/")
+        return { slug }
+      })
+
+    // Add some common fallback routes
+    const fallbackRoutes = [
+      { slug: ["gcp-5.7", "introduction"] },
+      { slug: ["gcp-5.7", "user-guide"] },
+      { slug: ["gcp-5.7", "api-reference"] },
+      { slug: ["gcp-5.7", "examples"] },
+      { slug: ["gcp-5.7", "development"] },
+      { slug: ["gcp-5.7", "architecture"] },
+    ]
+
+    return [...params, ...fallbackRoutes]
+  } catch (error) {
+    console.error("Error generating static params:", error)
+    // Return fallback routes if navigation service fails
+    return [
+      { slug: ["gcp-5.7", "introduction"] },
+      { slug: ["gcp-5.7", "user-guide"] },
+      { slug: ["gcp-5.7", "api-reference"] },
+      { slug: ["gcp-5.7", "examples"] },
+      { slug: ["gcp-5.7", "development"] },
+      { slug: ["gcp-5.7", "architecture"] },
+    ]
+  }
 }
