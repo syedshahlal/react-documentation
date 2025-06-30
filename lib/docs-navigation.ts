@@ -2,162 +2,65 @@ import { promises as fs } from "fs"
 import path from "path"
 import matter from "gray-matter"
 
-export interface DocItem {
-  title: string
+/**
+ * One flat ordered list of every markdown doc in the repo.
+ * Each item has an href (eg: "/docs/06_GCP Feature InDepth/cloud-functions")
+ * and a human-friendly title (front-matter `title` > first # heading > filename).
+ */
+export interface FlatDoc {
   href: string
-  order?: number
-  children?: DocItem[]
-}
-
-export interface DocSection {
   title: string
-  items: DocItem[]
 }
 
-export async function generateDocsNavigation(): Promise<DocSection[]> {
+/**
+ * Traverse the docs directory and return a depth-first, numerically-sorted list.
+ */
+export async function getFlatDocList(): Promise<FlatDoc[]> {
   const docsPath = path.join(process.cwd(), "docs")
+  const result: FlatDoc[] = []
 
-  try {
-    const entries = await fs.readdir(docsPath, { withFileTypes: true })
-    const sections: DocSection[] = []
+  async function walk(dir: string, hrefPrefix: string) {
+    const entries = await fs.readdir(dir, { withFileTypes: true })
 
-    // Sort directories by their numeric prefix
-    const sortedEntries = entries
-      .filter((entry) => entry.isDirectory())
-      .sort((a, b) => {
-        const aMatch = a.name.match(/^(\d+)_/)
-        const bMatch = b.name.match(/^(\d+)_/)
-        const aOrder = aMatch ? Number.parseInt(aMatch[1]) : 999
-        const bOrder = bMatch ? Number.parseInt(bMatch[1]) : 999
-        return aOrder - bOrder
-      })
-
-    for (const entry of sortedEntries) {
-      const sectionPath = path.join(docsPath, entry.name)
-      const sectionTitle = entry.name.replace(/^\d+_/, "").replace(/_/g, " ")
-
-      const items = await processDirectory(sectionPath, `/docs/${entry.name}`)
-
-      if (items.length > 0) {
-        sections.push({
-          title: sectionTitle,
-          items: items,
-        })
-      }
-    }
-
-    return sections
-  } catch (error) {
-    console.error("Error generating docs navigation:", error)
-    return []
-  }
-}
-
-async function processDirectory(dirPath: string, baseHref: string): Promise<DocItem[]> {
-  try {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true })
-    const items: DocItem[] = []
-
-    // Sort entries: directories first, then files, both by numeric prefix or alphabetically
-    const sortedEntries = entries.sort((a, b) => {
-      // Directories come first
+    // sort: folders first, then files – each by numeric prefix if present
+    entries.sort((a, b) => {
       if (a.isDirectory() && !b.isDirectory()) return -1
       if (!a.isDirectory() && b.isDirectory()) return 1
-
-      // Extract numeric prefix for ordering
-      const aMatch = a.name.match(/^(\d+)_/)
-      const bMatch = b.name.match(/^(\d+)_/)
-
-      if (aMatch && bMatch) {
-        return Number.parseInt(aMatch[1]) - Number.parseInt(bMatch[1])
-      } else if (aMatch) {
-        return -1
-      } else if (bMatch) {
-        return 1
+      const getOrder = (n: string) => {
+        const m = n.match(/^(\d+)_/)
+        return m ? Number(m[1]) : 9_999
       }
-
-      return a.name.localeCompare(b.name)
+      const orderDiff = getOrder(a.name) - getOrder(b.name)
+      return orderDiff !== 0 ? orderDiff : a.name.localeCompare(b.name)
     })
 
-    for (const entry of sortedEntries) {
-      const fullPath = path.join(dirPath, entry.name)
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name)
+      const cleanedName = entry.name.replace(/^\d+_/, "") // drop numeric prefix
+      const nextHref = `${hrefPrefix}/${entry.name}`.replace(/\\/g, "/")
 
       if (entry.isDirectory()) {
-        // Process subdirectory
-        const children = await processDirectory(fullPath, `${baseHref}/${entry.name}`)
-
-        if (children.length > 0) {
-          const dirTitle = entry.name.replace(/^\d+_/, "").replace(/_/g, " ")
-          items.push({
-            title: dirTitle,
-            href: `${baseHref}/${entry.name}`,
-            children: children,
-          })
-        }
+        await walk(fullPath, nextHref)
       } else if (entry.name.endsWith(".md")) {
-        // Process markdown file
-        const fileContent = await fs.readFile(fullPath, "utf-8")
-        const { data: frontmatter, content } = matter(fileContent)
+        // derive title
+        const raw = await fs.readFile(fullPath, "utf8")
+        const { data, content } = matter(raw)
+        const firstHeading = content.match(/^#\s+(.+)$/m)?.[1]?.trim()
+        const title = (data as any).title ?? firstHeading ?? cleanedName.replace(/\.md$/, "").replace(/[_-]/g, " ")
 
-        // Extract title from frontmatter or first heading
-        const headingMatch = content.match(/^#\s+(.+)$/m)
-        const title =
-          frontmatter.title ||
-          (headingMatch
-            ? headingMatch[1].trim()
-            : entry.name.replace(/\.md$/, "").replace(/^\d+_/, "").replace(/_/g, " "))
-
-        const fileName = entry.name.replace(/\.md$/, "")
-        const href = `${baseHref}/${fileName}`
-
-        items.push({
-          title: title,
-          href: href,
-          order: frontmatter.order,
+        result.push({
+          href: nextHref.replace(/\.md$/, ""),
+          title,
         })
       }
     }
-
-    return items
-  } catch (error) {
-    console.error(`Error processing directory ${dirPath}:`, error)
-    return []
-  }
-}
-
-export async function getDocumentOrder(): Promise<Array<{ href: string; title: string }>> {
-  const sections = await generateDocsNavigation()
-  const flatOrder: Array<{ href: string; title: string }> = []
-
-  function flattenItems(items: DocItem[]) {
-    for (const item of items) {
-      flatOrder.push({ href: item.href, title: item.title })
-      if (item.children) {
-        flattenItems(item.children)
-      }
-    }
   }
 
-  for (const section of sections) {
-    flattenItems(section.items)
+  try {
+    await walk(docsPath, "/docs")
+  } catch (err) {
+    console.error("Failed to read docs directory:", err)
   }
 
-  return flatOrder
-}
-
-export async function getPageNavigation(currentHref: string): Promise<{
-  previousPage?: { title: string; href: string }
-  nextPage?: { title: string; href: string }
-}> {
-  const documentOrder = await getDocumentOrder()
-  const currentIndex = documentOrder.findIndex((doc) => doc.href === currentHref)
-
-  if (currentIndex === -1) {
-    return {}
-  }
-
-  const previousPage = currentIndex > 0 ? documentOrder[currentIndex - 1] : undefined
-  const nextPage = currentIndex < documentOrder.length - 1 ? documentOrder[currentIndex + 1] : undefined
-
-  return { previousPage, nextPage }
+  return result
 }

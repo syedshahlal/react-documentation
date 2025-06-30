@@ -8,65 +8,16 @@ import { Header } from "@/components/header"
 import { promises as fs } from "fs"
 import path from "path"
 import matter from "gray-matter"
-
-// Function to get all documents in order for navigation
-async function getAllDocuments(): Promise<Array<{ href: string; title: string }>> {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/docs-structure`, {
-      cache: "no-store",
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch docs structure")
-    }
-
-    const data = await response.json()
-    const flatOrder: Array<{ href: string; title: string }> = []
-
-    function flattenItems(items: any[]) {
-      for (const item of items) {
-        flatOrder.push({ href: item.href, title: item.title })
-        if (item.children) {
-          flattenItems(item.children)
-        }
-      }
-    }
-
-    for (const section of data.sections) {
-      flattenItems(section.items)
-    }
-
-    return flatOrder
-  } catch (error) {
-    console.error("Error getting documents:", error)
-    // Fallback order
-    return [
-      { href: "/docs/introduction", title: "Introduction" },
-      { href: "/docs/user-guide", title: "User Guide" },
-      { href: "/docs/api-reference", title: "API Reference" },
-      { href: "/docs/examples", title: "Examples & Tutorials" },
-      { href: "/docs/development", title: "Development Guide" },
-      { href: "/docs/architecture", title: "Platform Architecture" },
-    ]
-  }
-}
+import { getFlatDocList } from "@/lib/docs-navigation"
 
 // Function to get page navigation
-async function getPageNavigation(currentHref: string): Promise<{
-  previousPage?: { title: string; href: string }
-  nextPage?: { title: string; href: string }
-}> {
-  const documentOrder = await getAllDocuments()
-  const currentIndex = documentOrder.findIndex((doc) => doc.href === currentHref)
-
-  if (currentIndex === -1) {
-    return {}
+async function getPageNavigation(currentHref: string) {
+  const flat = await getFlatDocList()
+  const idx = flat.findIndex((d) => d.href === currentHref)
+  return {
+    previousPage: idx > 0 ? flat[idx - 1] : undefined,
+    nextPage: idx !== -1 && idx < flat.length - 1 ? flat[idx + 1] : undefined,
   }
-
-  const previousPage = currentIndex > 0 ? documentOrder[currentIndex - 1] : undefined
-  const nextPage = currentIndex < documentOrder.length - 1 ? documentOrder[currentIndex + 1] : undefined
-
-  return { previousPage, nextPage }
 }
 
 // Tries to load a real Markdown file from the docs folder.
