@@ -43,78 +43,73 @@ const navigationService = new NavigationService()
 
 const getDocContent = async (slug: string[]): Promise<DocData | null> => {
   try {
-    // Initialize navigation service if not already done
     await navigationService.initialize()
 
-    // Try different possible file paths
-    const possiblePaths = [
-      // Direct path with gcp-5.7 prefix
-      path.join(process.cwd(), "docs", "gcp-5.7", ...slug) + ".md",
-      // Path without gcp-5.7 prefix
-      path.join(process.cwd(), "docs", ...slug) + ".md",
-      // Try with different file extensions
-      path.join(process.cwd(), "docs", "gcp-5.7", ...slug) + ".mdx",
-      // Try finding in subdirectories
-      path.join(process.cwd(), "docs", "gcp-5.7", slug.join("/"), "index.md"),
+    const slugPath = path.join(...slug) // e.g.  gcp-5.7/01_GRA_Core_Platform Introduction/introduction
+    const baseDocs = path.join(process.cwd(), "docs")
+
+    // 1. Variants WITHOUT extra prefix
+    const variants = [
+      path.join(baseDocs, `${slugPath}.md`),
+      path.join(baseDocs, `${slugPath}.mdx`),
+      path.join(baseDocs, slugPath, "index.md"),
+      path.join(baseDocs, slugPath, "index.mdx"),
     ]
 
-    // Also try to find the file using navigation service
-    const navigationItem = navigationService.findItemBySlug(slug.join("/"))
-    if (navigationItem?.filePath) {
-      possiblePaths.unshift(path.join(process.cwd(), navigationItem.filePath))
+    // 2. If slugPath doesn't already start with gcp-5.7, also try with that prefix
+    if (!slug[0]?.startsWith("gcp-5.7")) {
+      const prefixed = path.join(baseDocs, "gcp-5.7", slugPath)
+      variants.push(
+        `${prefixed}.md`,
+        `${prefixed}.mdx`,
+        path.join(prefixed, "index.md"),
+        path.join(prefixed, "index.mdx"),
+      )
     }
 
-    let filePath: string | null = null
-    let fileContent = ""
+    // 3. Variant from navigation service (if configured)
+    const navItem = navigationService.findItemBySlug(slugPath)
+    if (navItem?.filePath) {
+      variants.unshift(path.join(process.cwd(), navItem.filePath))
+    }
 
-    // Try each possible path
-    for (const possiblePath of possiblePaths) {
+    // Find the first readable file
+    let filePath: string | null = null
+    for (const p of variants) {
       try {
-        await fs.access(possiblePath)
-        filePath = possiblePath
-        fileContent = await fs.readFile(possiblePath, "utf8")
+        await fs.access(p)
+        filePath = p
         break
       } catch {
-        // Continue to next path
-        continue
+        /* skip */
       }
     }
 
-    if (!filePath || !fileContent) {
-      console.log(`File not found for slug: ${slug.join("/")}, tried paths:`, possiblePaths)
+    if (!filePath) {
+      console.warn("Document not found. Tried:", variants)
       return null
     }
 
-    // Parse frontmatter and content
-    const { data: frontmatter, content } = matter(fileContent)
-
-    // Get file stats for last modified date
+    const raw = await fs.readFile(filePath, "utf8")
+    const { data: frontmatter, content } = matter(raw)
     const stats = await fs.stat(filePath)
-    const lastUpdated = frontmatter.lastUpdated || stats.mtime.toISOString().split("T")[0]
 
-    // Calculate estimated read time if not provided
     const wordCount = content.split(/\s+/).length
     const estimatedReadTime = frontmatter.estimatedReadTime || Math.ceil(wordCount / 200)
+    const lastUpdated = frontmatter.lastUpdated || stats.mtime.toISOString().split("T")[0]
 
-    const docData: DocData = {
-      title: frontmatter.title || slug[slug.length - 1].replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+    return {
+      title: frontmatter.title ?? slug[slug.length - 1].replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       content,
       lastUpdated,
       metadata: {
-        title: frontmatter.title,
-        description: frontmatter.description,
-        author: frontmatter.author,
-        lastUpdated,
-        tags: frontmatter.tags || [],
-        difficulty: frontmatter.difficulty || "beginner",
-        estimatedReadTime,
         ...frontmatter,
+        estimatedReadTime,
+        lastUpdated,
       },
     }
-
-    return docData
-  } catch (error) {
-    console.error("Error reading document:", error)
+  } catch (err) {
+    console.error("getDocContent error:", err)
     return null
   }
 }
