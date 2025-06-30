@@ -6,7 +6,7 @@ import { Book, Users, Code, Layers, Wrench, Database, ArrowRight } from "lucide-
 import Link from "next/link"
 import { Banner } from "@/components/banner"
 import { Header } from "@/components/header"
-import { Logo } from "@/components/bofa_logo" 
+import { Logo } from "@/components/bofa_logo"
 
 const documentationSections = [
   {
@@ -67,7 +67,7 @@ export default function HomePage() {
 
       {/* Header */}
       <Header />
-      <bofa_logo />
+      <Logo />
       {/* Main Content */}
       <main className="container mx-auto px-4 py-12 pt-20">
         {/* Hero Section */}
