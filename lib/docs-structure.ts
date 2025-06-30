@@ -14,18 +14,18 @@ export const docsStructure: DocItem[] = [
   {
     id: "gra-core-platform-introduction",
     title: "GRA Core Platform Introduction",
-    href: "/docs/01_GRA_Core_Platform Introduction/introduction",
+    href: "/docs/introduction",
     items: [],
   },
   {
     id: "user-guide",
     title: "User Guide",
-    href: "/docs/02_User Guide/user-guide",
+    href: "/docs/user-guide",
     items: [
       {
         id: "local-setup",
         title: "Local Setup",
-        href: "/docs/02_User Guide/Local_setup/getting-started",
+        href: "/docs/user-guide/local-setup",
         items: [],
       },
     ],
@@ -33,30 +33,30 @@ export const docsStructure: DocItem[] = [
   {
     id: "api-reference",
     title: "API Reference",
-    href: "/docs/03_API Reference/api-reference",
+    href: "/docs/api-reference",
     items: [],
   },
   {
     id: "examples-tutorials",
     title: "Examples & Tutorials",
-    href: "/docs/04_Examples & Tutorials",
+    href: "/docs/examples",
     items: [
       {
         id: "basic-setup",
         title: "Basic Setup",
-        href: "/docs/04_Examples & Tutorials/basic-setup",
+        href: "/docs/examples/basic-setup",
         items: [],
       },
       {
         id: "user-authentication",
         title: "User Authentication",
-        href: "/docs/04_Examples & Tutorials/user-authentication",
+        href: "/docs/examples/user-authentication",
         items: [],
       },
       {
         id: "data-management",
         title: "Data Management",
-        href: "/docs/04_Examples & Tutorials/data-management",
+        href: "/docs/examples/data-management",
         items: [],
       },
     ],
@@ -64,24 +64,24 @@ export const docsStructure: DocItem[] = [
   {
     id: "development-guide",
     title: "Development Guide",
-    href: "/docs/05_Development Guide",
+    href: "/docs/development",
     items: [
       {
         id: "security-best-practices",
         title: "Security Best Practices",
-        href: "/docs/05_Development Guide/security-best-practices",
+        href: "/docs/development/security-best-practices",
         items: [],
       },
       {
         id: "performance-optimization",
         title: "Performance Optimization",
-        href: "/docs/05_Development Guide/performance-optimization",
+        href: "/docs/development/performance-optimization",
         items: [],
       },
       {
         id: "advanced-monitoring",
         title: "Advanced Monitoring",
-        href: "/docs/05_Development Guide/advanced-monitoring",
+        href: "/docs/development/advanced-monitoring",
         items: [],
       },
     ],
@@ -89,52 +89,52 @@ export const docsStructure: DocItem[] = [
   {
     id: "gcp-feature-indepth",
     title: "GCP Feature InDepth",
-    href: "/docs/06_GCP Feature InDepth",
+    href: "/docs/architecture",
     items: [
       {
         id: "cloud-functions",
         title: "Cloud Functions",
-        href: "/docs/06_GCP Feature InDepth/cloud-functions",
+        href: "/docs/architecture/cloud-functions",
         items: [],
       },
       {
         id: "cloud-storage",
         title: "Cloud Storage",
-        href: "/docs/06_GCP Feature InDepth/cloud-storage",
+        href: "/docs/architecture/cloud-storage",
         items: [],
       },
     ],
   },
 ]
 
-// Flatten the docs structure into a single array for easier navigation
-export function getFlattenedDocs(): { title: string; href: string }[] {
-  const flattenedDocs: { title: string; href: string }[] = []
+/**
+ * Very small helper that returns Previous / Next based on
+ * the order of markdown files in the docs/ folder.
+ *
+ * To reorder navigation, just change the `orderedHrefs` array.
+ * When you add a new doc, push its route into the correct place.
+ */
 
-  function flatten(items: DocItem[]) {
-    for (const item of items) {
-      flattenedDocs.push({
-        title: item.title,
-        href: item.href,
-      })
+type NavLink = { href: string; title: string }
 
-      if (item.items && item.items.length > 0) {
-        flatten(item.items)
-      }
-    }
-  }
+const orderedHrefs: NavLink[] = [
+  { href: "/docs/introduction", title: "Introduction to GRA Core Platform" },
+  { href: "/docs/user-guide", title: "User Guide" },
+  { href: "/docs/api-reference", title: "API Reference" },
+  { href: "/docs/examples", title: "Examples & Tutorials" },
+  { href: "/docs/development", title: "Development Guide" },
+  { href: "/docs/architecture", title: "Platform Architecture" },
+]
 
-  flatten(docsStructure)
-  return flattenedDocs
-}
-
-// Get the previous and next pages for a given href
 export function getNavigation(currentHref: string) {
-  const flatDocs = getFlattenedDocs()
-  const currentIndex = flatDocs.findIndex((doc) => doc.href === currentHref)
-
+  const idx = orderedHrefs.findIndex((p) => p.href === currentHref)
   return {
-    previousPage: currentIndex > 0 ? flatDocs[currentIndex - 1] : undefined,
-    nextPage: currentIndex < flatDocs.length - 1 ? flatDocs[currentIndex + 1] : undefined,
+    previousPage: idx > 0 ? orderedHrefs[idx - 1] : undefined,
+    nextPage: idx !== -1 && idx < orderedHrefs.length - 1 ? orderedHrefs[idx + 1] : undefined,
   }
 }
+
+/**
+ * Expose the flat list if the sidebar or any other component needs it.
+ */
+export const flatDocsList = orderedHrefs
