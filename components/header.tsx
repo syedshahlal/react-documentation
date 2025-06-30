@@ -126,7 +126,7 @@ export function Header() {
           {/* Center Tabs */}
           <div className="flex items-center space-x-8">
             <button className="text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 pb-1">
-              About
+              Home
             </button>
             <button className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 pb-1">
               User Guide
