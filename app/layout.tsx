@@ -4,9 +4,15 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.dev",
+  title: "GRA Core Platform Documentation",
+  description: "Created with Next.js + MDX",
+  generator: "GRA Tech",
+  icons: {
+  icon: [
+    { url: "/favicon-light.png", media: "(prefers-color-scheme: light)" },
+    { url: "/favicon-dark.png", media: "(prefers-color-scheme: dark)" },
+  ],
+},
 }
 
 export default function RootLayout({
