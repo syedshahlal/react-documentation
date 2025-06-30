@@ -6,50 +6,53 @@ import { Book, Users, Code, Layers, Wrench, Database, ArrowRight } from "lucide-
 import Link from "next/link"
 import { Banner } from "@/components/banner"
 import { Header } from "@/components/header"
-import { Logo } from "@/components/bofa_logo"
 
-const documentationSections = [
+const featureCards = [
   {
-    title: "GRA Core Platform Introduction",
-    description: "Get started with GRA Core Platform fundamentals and core concepts.",
-    icon: Book,
-    href: "/docs/introduction",
-    color: "bg-blue-500",
-  },
-  {
-    title: "User Guide",
-    description: "Complete guide to using GRA Core Platform with step-by-step instructions.",
-    icon: Users,
-    href: "/docs/user-guide",
-    color: "bg-green-500",
-  },
-  {
-    title: "API Reference",
-    description: "Comprehensive API documentation with examples and authentication guides.",
-    icon: Code,
-    href: "/docs/api-reference",
-    color: "bg-purple-500",
-  },
-  {
-    title: "Examples & Tutorials",
-    description: "Real-world examples and step-by-step tutorials for common use cases.",
+    title: "Cloud-Native Architecture",
+    description:
+      "Built on modern cloud infrastructure with auto-scaling, high availability, and enterprise-grade security.",
     icon: Layers,
-    href: "/docs/examples",
-    color: "bg-orange-500",
+    color: "bg-blue-500",
+    features: ["Auto-scaling", "99.9% Uptime", "Enterprise Security"],
   },
   {
-    title: "Development Guide",
-    description: "Development workflows, contribution guidelines, and advanced topics.",
-    icon: Wrench,
-    href: "/docs/development",
-    color: "bg-cyan-500",
+    title: "Developer Experience",
+    description:
+      "Intuitive APIs, comprehensive SDKs, and powerful developer tools to accelerate your development workflow.",
+    icon: Code,
+    color: "bg-green-500",
+    features: ["RESTful APIs", "Multiple SDKs", "CLI Tools"],
   },
   {
-    title: "GCP Features Indepth",
-    description: "Deep dive into GRA Core Platform Features and Implementations.",
+    title: "Real-time Analytics",
+    description:
+      "Advanced analytics and monitoring with real-time insights, custom dashboards, and intelligent alerts.",
     icon: Database,
-    href: "/docs/architecture",
+    color: "bg-purple-500",
+    features: ["Live Dashboards", "Custom Metrics", "Smart Alerts"],
+  },
+  {
+    title: "Team Collaboration",
+    description:
+      "Built-in collaboration tools with role-based access control, team workspaces, and project management.",
+    icon: Users,
+    color: "bg-orange-500",
+    features: ["Role Management", "Team Workspaces", "Project Tracking"],
+  },
+  {
+    title: "Integration Hub",
+    description: "Seamlessly connect with popular tools and services through our extensive integration marketplace.",
+    icon: Wrench,
+    color: "bg-cyan-500",
+    features: ["200+ Integrations", "Custom Webhooks", "API Gateway"],
+  },
+  {
+    title: "Enterprise Ready",
+    description: "Enterprise-grade features including SSO, compliance certifications, and dedicated support.",
+    icon: Book,
     color: "bg-indigo-500",
+    features: ["SSO Integration", "SOC 2 Compliant", "24/7 Support"],
   },
 ]
 
@@ -67,7 +70,7 @@ export default function HomePage() {
 
       {/* Header */}
       <Header />
-      <Logo />
+
       {/* Main Content */}
       <main className="container mx-auto px-4 py-12 pt-20">
         {/* Hero Section */}
@@ -82,33 +85,41 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Documentation Cards */}
+        {/* Feature Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-          {documentationSections.map((section, index) => {
-            const IconComponent = section.icon
+          {featureCards.map((feature, index) => {
+            const IconComponent = feature.icon
             return (
-              <Link key={index} href={section.href}>
-                <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <div
-                        className={`w-12 h-12 ${section.color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}
-                      >
-                        <IconComponent className="w-6 h-6 text-white" />
-                      </div>
-                      <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-1 transition-all duration-300" />
+              <Card
+                key={index}
+                className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm"
+              >
+                <CardHeader className="pb-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div
+                      className={`w-12 h-12 ${feature.color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}
+                    >
+                      <IconComponent className="w-6 h-6 text-white" />
                     </div>
-                    <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {section.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                      {section.description}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              </Link>
+                  </div>
+                  <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    {feature.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+                    {feature.description}
+                  </CardDescription>
+                  <div className="space-y-2">
+                    {feature.features.map((item, idx) => (
+                      <div key={idx} className="flex items-center text-sm text-slate-500 dark:text-slate-400">
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></div>
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )
           })}
         </div>
