@@ -9,20 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  Code,
-  PackageIcon,
-  FileText,
-  TypeIcon as FunctionIcon,
-  Settings,
-  Search,
-  Download,
-  BookOpen,
-  Zap,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-} from "lucide-react"
+import { Code, PackageIcon, FileText, TypeIcon as FunctionIcon, Settings, Search, Download, BookOpen, Zap, AlertCircle, CheckCircle, Loader2, Github, ExternalLink } from 'lucide-react'
 
 interface DocString {
   description: string
@@ -86,6 +73,39 @@ interface APIDocumentationProps {
   initialRepo?: string
 }
 
+const SAMPLE_REPOS = [
+  {
+    name: "Requests",
+    url: "https://github.com/psf/requests",
+    description: "HTTP library for Python",
+    icon: "🌐"
+  },
+  {
+    name: "Flask",
+    url: "https://github.com/pallets/flask",
+    description: "Lightweight web framework",
+    icon: "🌶️"
+  },
+  {
+    name: "FastAPI",
+    url: "https://github.com/tiangolo/fastapi",
+    description: "Modern web framework for APIs",
+    icon: "⚡"
+  },
+  {
+    name: "Django",
+    url: "https://github.com/django/django",
+    description: "High-level web framework",
+    icon: "🎸"
+  },
+  {
+    name: "NumPy",
+    url: "https://github.com/numpy/numpy",
+    description: "Scientific computing library",
+    icon: "🔢"
+  }
+]
+
 export default function APIDocumentation({ initialRepo = "" }: APIDocumentationProps) {
   const [repoUrl, setRepoUrl] = useState(initialRepo)
   const [documentation, setDocumentation] = useState<Documentation | null>(null)
@@ -127,6 +147,11 @@ export default function APIDocumentation({ initialRepo = "" }: APIDocumentationP
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadSampleRepo = (url: string) => {
+    setRepoUrl(url)
+    setError(null)
   }
 
   const renderDocString = (docstring: DocString) => {
@@ -373,11 +398,42 @@ export default function APIDocumentation({ initialRepo = "" }: APIDocumentationP
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-4 flex items-center gap-2">
           <BookOpen className="w-8 h-8" />
-          API Documentation Generator
+          Python API Documentation Generator
         </h1>
         <p className="text-muted-foreground mb-6">
-          Generate beautiful API documentation from Python repositories by analyzing __init__.py files and docstrings.
+          Generate comprehensive API documentation from any Python repository by analyzing docstrings and code structure.
         </p>
+
+        {/* Sample Repositories */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Github className="w-5 h-5" />
+            Try Sample Repositories
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {SAMPLE_REPOS.map((repo) => (
+              <Card key={repo.url} className="cursor-pointer hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{repo.icon}</span>
+                      <h4 className="font-semibold">{repo.name}</h4>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => loadSampleRepo(repo.url)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{repo.description}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
 
         <div className="flex gap-4 mb-6">
           <Input
