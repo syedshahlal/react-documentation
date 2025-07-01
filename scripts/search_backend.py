@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 import sys
 import json
+import os
+from pathlib import Path
+
+# Add the scripts directory to Python path
+sys.path.insert(0, str(Path(__file__).parent))
+
 from search_engine import DocumentSearchEngine
 
 def main():

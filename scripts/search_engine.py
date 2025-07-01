@@ -4,9 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-import markdown
-from markdown.extensions import meta
-import yaml
+import html
 from datetime import datetime
 
 class DocumentSearchEngine:
@@ -54,7 +52,7 @@ class DocumentSearchEngine:
         conn.commit()
         conn.close()
         
-    def extract_frontmatter(self, content: str) -> tuple[Dict[str, Any], str]:
+    def extract_frontmatter(self, content: str) -> tuple:
         """Extract YAML frontmatter from markdown content"""
         frontmatter = {}
         
@@ -65,11 +63,52 @@ class DocumentSearchEngine:
                 if len(parts) >= 3:
                     frontmatter_text = parts[1].strip()
                     content = parts[2].strip()
-                    frontmatter = yaml.safe_load(frontmatter_text) or {}
-            except yaml.YAMLError:
-                pass
+                    
+                    # Simple YAML parser for basic frontmatter
+                    for line in frontmatter_text.split('\n'):
+                        if ':' in line:
+                            key, value = line.split(':', 1)
+                            key = key.strip()
+                            value = value.strip().strip('"\'')
+                            
+                            # Handle arrays
+                            if value.startswith('[') and value.endswith(']'):
+                                value = [item.strip().strip('"\'') for item in value[1:-1].split(',')]
+                            
+                            frontmatter[key] = value
+            except Exception as e:
+                print(f"Error parsing frontmatter: {e}")
                 
         return frontmatter, content
+    
+    def markdown_to_text(self, markdown_content: str) -> str:
+        """Convert markdown to plain text"""
+        # Remove code blocks
+        text = re.sub(r'```[\s\S]*?```', '', markdown_content)
+        text = re.sub(r'`[^`]*`', '', text)
+        
+        # Remove headers
+        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+        
+        # Remove links but keep text
+        text = re.sub(r'\[([^\]]+)\]$$[^$$]+\)', r'\1', text)
+        
+        # Remove images
+        text = re.sub(r'!\[[^\]]*\]$$[^$$]+\)', '', text)
+        
+        # Remove bold/italic
+        text = re.sub(r'\*\*([^\*]+)\*\*', r'\1', text)
+        text = re.sub(r'\*([^\*]+)\*', r'\1', text)
+        text = re.sub(r'__([^_]+)__', r'\1', text)
+        text = re.sub(r'_([^_]+)_', r'\1', text)
+        
+        # Remove HTML tags
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # Clean up whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text
     
     def process_markdown_file(self, file_path: Path) -> Optional[Dict[str, Any]]:
         """Process a single markdown file and extract metadata"""
@@ -80,13 +119,8 @@ class DocumentSearchEngine:
             # Extract frontmatter
             frontmatter, content = self.extract_frontmatter(raw_content)
             
-            # Process markdown to get plain text
-            md = markdown.Markdown(extensions=['meta'])
-            html_content = md.convert(content)
-            
-            # Remove HTML tags for plain text content
-            plain_text = re.sub(r'<[^>]+>', '', html_content)
-            plain_text = re.sub(r'\s+', ' ', plain_text).strip()
+            # Convert markdown to plain text
+            plain_text = self.markdown_to_text(content)
             
             # Calculate word count and read time
             word_count = len(plain_text.split())
@@ -109,12 +143,17 @@ class DocumentSearchEngine:
             stat = file_path.stat()
             last_modified = datetime.fromtimestamp(stat.st_mtime)
             
+            # Handle tags
+            tags = frontmatter.get('tags', [])
+            if isinstance(tags, str):
+                tags = [tag.strip() for tag in tags.split(',')]
+            
             return {
                 'file_path': str(file_path.relative_to(self.docs_path.parent)),
                 'title': title,
                 'content': plain_text,
                 'excerpt': excerpt,
-                'tags': json.dumps(frontmatter.get('tags', [])),
+                'tags': json.dumps(tags),
                 'category': frontmatter.get('category', ''),
                 'difficulty': frontmatter.get('difficulty', ''),
                 'author': frontmatter.get('author', ''),
@@ -229,8 +268,8 @@ class DocumentSearchEngine:
         if query.strip():
             sql_query = f'''
                 SELECT d.*, 
-                       snippet(search_index, 2, '<mark>', '</mark>', '...', 32) as snippet,
-                       rank
+                       SUBSTR(d.content, 1, 200) || '...' as snippet,
+                       1 as rank
                 FROM search_index 
                 JOIN documents d ON search_index.rowid = d.id
                 {where_clause}
