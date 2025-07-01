@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronDown, ChevronRight, Search, FileText, Folder, FolderOpen, X, Clock, ArrowRight } from "lucide-react"
-import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -47,13 +46,13 @@ function Sidebar({ className }: SidebarProps) {
 
   // Load recent searches from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("recent-searches")
-    if (saved) {
-      try {
+    try {
+      const saved = localStorage.getItem("recent-searches")
+      if (saved) {
         setRecentSearches(JSON.parse(saved))
-      } catch (e) {
-        console.error("Failed to parse recent searches:", e)
       }
+    } catch (e) {
+      console.error("Failed to parse recent searches:", e)
     }
   }, [])
 
@@ -61,9 +60,13 @@ function Sidebar({ className }: SidebarProps) {
   const saveRecentSearch = (query: string) => {
     if (!query.trim() || recentSearches.includes(query)) return
 
-    const updated = [query, ...recentSearches.slice(0, 4)] // Keep only 5 recent searches
+    const updated = [query, ...recentSearches.slice(0, 4)]
     setRecentSearches(updated)
-    localStorage.setItem("recent-searches", JSON.stringify(updated))
+    try {
+      localStorage.setItem("recent-searches", JSON.stringify(updated))
+    } catch (e) {
+      console.error("Failed to save recent searches:", e)
+    }
   }
 
   // Load document structure
@@ -72,7 +75,6 @@ function Sidebar({ className }: SidebarProps) {
       .then((res) => res.json())
       .then((data) => {
         setDocStructure(data)
-        // Auto-expand items that contain the current path
         const pathsToExpand = new Set<string>()
         const findAndExpandPath = (items: DocItem[], currentPath: string) => {
           items.forEach((item) => {
@@ -106,7 +108,6 @@ function Sidebar({ className }: SidebarProps) {
       const data = await response.json()
 
       if (response.ok && data.results) {
-        // Add relevance scoring based on title match and content match
         const scoredResults = data.results
           .map((result: any) => ({
             ...result,
@@ -134,21 +135,15 @@ function Sidebar({ className }: SidebarProps) {
 
     let score = 0
 
-    // Title exact match gets highest score
     if (titleLower === queryLower) score += 100
-    // Title starts with query
     else if (titleLower.startsWith(queryLower)) score += 80
-    // Title contains query
     else if (titleLower.includes(queryLower)) score += 60
 
-    // Content relevance
     const contentMatches = (contentLower.match(new RegExp(queryLower, "g")) || []).length
     score += Math.min(contentMatches * 5, 40)
 
-    // Category bonus
     if (result.category && result.category.toLowerCase().includes(queryLower)) score += 20
 
-    // Tags bonus
     if (result.tags && result.tags.some((tag: string) => tag.toLowerCase().includes(queryLower))) score += 15
 
     return score
@@ -184,7 +179,6 @@ function Sidebar({ className }: SidebarProps) {
   const handleSearchSubmit = (query: string) => {
     if (query.trim()) {
       saveRecentSearch(query.trim())
-      // Navigate to full search page for comprehensive results
       window.location.href = `/search?q=${encodeURIComponent(query.trim())}`
     }
   }
@@ -193,7 +187,9 @@ function Sidebar({ className }: SidebarProps) {
     setSearchTerm("")
     setSearchResults([])
     setShowSearchResults(false)
-    searchInputRef.current?.focus()
+    if (searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
   }
 
   const highlightText = (text: string, query: string) => {
@@ -283,28 +279,37 @@ function Sidebar({ className }: SidebarProps) {
       <div className="p-4 border-b bg-muted/30">
         <div className="space-y-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+            <input
               ref={searchInputRef}
+              type="text"
               placeholder="Search across all documentation..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                console.log("Search input changed:", e.target.value)
+                setSearchTerm(e.target.value)
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
+                  e.preventDefault()
                   handleSearchSubmit(searchTerm)
                 }
                 if (e.key === "Escape") {
+                  e.preventDefault()
                   clearSearch()
                 }
               }}
-              className="pl-10 pr-10 h-10 bg-background"
+              className="w-full pl-10 pr-10 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+              autoComplete="off"
+              spellCheck="false"
             />
             {searchTerm && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={clearSearch}
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-muted"
+                type="button"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -331,6 +336,7 @@ function Sidebar({ className }: SidebarProps) {
                     size="sm"
                     onClick={() => setSearchTerm(recent)}
                     className="h-6 px-2 text-xs"
+                    type="button"
                   >
                     {recent}
                   </Button>
@@ -356,6 +362,7 @@ function Sidebar({ className }: SidebarProps) {
                     size="sm"
                     onClick={() => handleSearchSubmit(searchTerm)}
                     className="text-xs"
+                    type="button"
                   >
                     View all <ArrowRight className="w-3 h-3 ml-1" />
                   </Button>
@@ -415,7 +422,13 @@ function Sidebar({ className }: SidebarProps) {
                   <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No results found for "{searchTerm}"</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => handleSearchSubmit(searchTerm)} className="text-xs">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSearchSubmit(searchTerm)}
+                  className="text-xs"
+                  type="button"
+                >
                   Search all documentation <ArrowRight className="w-3 h-3 ml-1" />
                 </Button>
               </div>

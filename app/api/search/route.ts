@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { readdir, readFile, stat } from "fs/promises"
 import { join } from "path"
-import matter from "gray-matter"
 
 interface SearchResult {
   id: string
@@ -99,11 +98,40 @@ function extractCategory(filePath: string): string {
   return "General"
 }
 
+// Function to extract frontmatter (simple implementation)
+function extractFrontmatter(content: string): { data: any; content: string } {
+  const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/
+  const match = content.match(frontmatterRegex)
+
+  if (match) {
+    const frontmatterText = match[1]
+    const markdownContent = match[2]
+
+    // Simple YAML parsing (basic implementation)
+    const data: any = {}
+    frontmatterText.split("\n").forEach((line) => {
+      const colonIndex = line.indexOf(":")
+      if (colonIndex > 0) {
+        const key = line.substring(0, colonIndex).trim()
+        const value = line
+          .substring(colonIndex + 1)
+          .trim()
+          .replace(/^["']|["']$/g, "")
+        data[key] = value
+      }
+    })
+
+    return { data, content: markdownContent }
+  }
+
+  return { data: {}, content }
+}
+
 // Function to process a single markdown file
 async function processMarkdownFile(filePath: string): Promise<SearchResult | null> {
   try {
     const content = await readFile(filePath, "utf-8")
-    const { data: frontmatter, content: markdownContent } = matter(content)
+    const { data: frontmatter, content: markdownContent } = extractFrontmatter(content)
 
     // Extract plain text
     const plainText = markdownToText(markdownContent)
@@ -139,9 +167,7 @@ async function processMarkdownFile(filePath: string): Promise<SearchResult | nul
     // Extract tags
     let tags: string[] = []
     if (frontmatter.tags) {
-      if (Array.isArray(frontmatter.tags)) {
-        tags = frontmatter.tags
-      } else if (typeof frontmatter.tags === "string") {
+      if (typeof frontmatter.tags === "string") {
         tags = frontmatter.tags.split(",").map((tag) => tag.trim())
       }
     }
@@ -260,7 +286,7 @@ export async function GET(request: NextRequest) {
     const limitedResults = searchResults.slice(0, limit)
 
     // Generate suggestions (simple implementation)
-    const suggestions = query ? [] : []
+    const suggestions: string[] = []
     if (query && limitedResults.length === 0) {
       // Generate suggestions based on available titles
       const titleWords = validDocs.flatMap((doc) => doc.title.toLowerCase().split(/\s+/))
@@ -287,7 +313,7 @@ export async function GET(request: NextRequest) {
         total_words: totalWords,
         average_read_time: Math.round(avgReadTime * 10) / 10,
         categories,
-        difficulties: [], // Could be extracted from frontmatter if needed
+        difficulties: [],
         tags: allTags,
       },
     })
