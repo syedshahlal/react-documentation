@@ -111,7 +111,7 @@ export function Sidebar() {
     setExpandedSections((prev) => (prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title]))
   }
 
-  const searchContent = (query: string) => {
+  const searchContent = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([])
       setIsSearching(false)
@@ -119,48 +119,36 @@ export function Sidebar() {
     }
 
     setIsSearching(true)
-    const results: any[] = []
-    const queryLower = query.toLowerCase()
 
-    // Recursive function to search through nested navigation
-    const searchNavigation = (items: NavItem[], sectionPath: string[] = []) => {
-      items.forEach((item) => {
-        if (item.type === "folder" && item.items) {
-          searchNavigation(item.items, [...sectionPath, item.title])
-        } else if (item.type === "file" && item.title.toLowerCase().includes(queryLower)) {
-          results.push({
-            ...item,
-            section: sectionPath.length > 0 ? sectionPath.join(" > ") : "Root",
-            type: "navigation",
-            snippet: `Found in ${sectionPath.length > 0 ? sectionPath.join(" > ") : "root"} navigation`,
-          })
-        }
-      })
+    try {
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=10`)
+      const data = await response.json()
+
+      if (response.ok) {
+        // Transform results to match existing interface
+        const transformedResults = data.results.map((result: any) => ({
+          title: result.title,
+          href: result.url,
+          icon: "FileText",
+          section: result.category || "Documentation",
+          snippet: result.snippet || result.excerpt,
+          metadata: {
+            tags: result.tags,
+            difficulty: result.difficulty,
+            estimatedReadTime: result.read_time,
+            description: result.excerpt,
+          },
+        }))
+
+        setSearchResults(transformedResults)
+      } else {
+        console.error("Search failed:", data.error)
+        setSearchResults([])
+      }
+    } catch (error) {
+      console.error("Search error:", error)
+      setSearchResults([])
     }
-
-    // Search through navigation items
-    searchNavigation(navigation)
-
-    // Remove duplicates and sort by relevance
-    const uniqueResults = results.filter(
-      (result, index, self) => index === self.findIndex((r) => r.href === result.href),
-    )
-
-    // Sort by relevance (exact title matches first)
-    uniqueResults.sort((a, b) => {
-      const aExact = a.title.toLowerCase() === queryLower
-      const bExact = b.title.toLowerCase() === queryLower
-      const aStarts = a.title.toLowerCase().startsWith(queryLower)
-      const bStarts = b.title.toLowerCase().startsWith(queryLower)
-
-      if (aExact && !bExact) return -1
-      if (!aExact && bExact) return 1
-      if (aStarts && !bStarts) return -1
-      if (!aStarts && bStarts) return 1
-      return a.title.localeCompare(b.title)
-    })
-
-    setSearchResults(uniqueResults)
   }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
