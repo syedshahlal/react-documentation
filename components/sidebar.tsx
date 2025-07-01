@@ -1,11 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronDown, ChevronRight, Search, FileText, Folder, FolderOpen } from "lucide-react"
+import { ChevronDown, ChevronRight, Search, FileText, Folder, FolderOpen, X, Clock, ArrowRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
 interface DocItem {
@@ -14,16 +17,56 @@ interface DocItem {
   children?: DocItem[]
 }
 
+interface SearchResult {
+  id: string
+  title: string
+  url: string
+  excerpt: string
+  file_path: string
+  category: string
+  tags: string[]
+  read_time: number
+  relevance_score: number
+}
+
 interface SidebarProps {
   className?: string
 }
 
 function Sidebar({ className }: SidebarProps) {
   const [searchTerm, setSearchTerm] = useState("")
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [docStructure, setDocStructure] = useState<DocItem[]>([])
+  const [recentSearches, setRecentSearches] = useState<string[]>([])
   const pathname = usePathname()
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout>()
 
+  // Load recent searches from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("recent-searches")
+    if (saved) {
+      try {
+        setRecentSearches(JSON.parse(saved))
+      } catch (e) {
+        console.error("Failed to parse recent searches:", e)
+      }
+    }
+  }, [])
+
+  // Save recent searches to localStorage
+  const saveRecentSearch = (query: string) => {
+    if (!query.trim() || recentSearches.includes(query)) return
+
+    const updated = [query, ...recentSearches.slice(0, 4)] // Keep only 5 recent searches
+    setRecentSearches(updated)
+    localStorage.setItem("recent-searches", JSON.stringify(updated))
+  }
+
+  // Load document structure
   useEffect(() => {
     fetch("/api/docs-structure")
       .then((res) => res.json())
@@ -47,6 +90,87 @@ function Sidebar({ className }: SidebarProps) {
       .catch(console.error)
   }, [pathname])
 
+  // Debounced search function
+  const performSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([])
+      setShowSearchResults(false)
+      return
+    }
+
+    setIsSearching(true)
+    setShowSearchResults(true)
+
+    try {
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=8`)
+      const data = await response.json()
+
+      if (response.ok && data.results) {
+        // Add relevance scoring based on title match and content match
+        const scoredResults = data.results
+          .map((result: any) => ({
+            ...result,
+            relevance_score: calculateRelevanceScore(result, query),
+          }))
+          .sort((a: any, b: any) => b.relevance_score - a.relevance_score)
+
+        setSearchResults(scoredResults)
+      } else {
+        setSearchResults([])
+      }
+    } catch (error) {
+      console.error("Search failed:", error)
+      setSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  // Calculate relevance score for search results
+  const calculateRelevanceScore = (result: any, query: string): number => {
+    const queryLower = query.toLowerCase()
+    const titleLower = result.title.toLowerCase()
+    const contentLower = result.content?.toLowerCase() || ""
+
+    let score = 0
+
+    // Title exact match gets highest score
+    if (titleLower === queryLower) score += 100
+    // Title starts with query
+    else if (titleLower.startsWith(queryLower)) score += 80
+    // Title contains query
+    else if (titleLower.includes(queryLower)) score += 60
+
+    // Content relevance
+    const contentMatches = (contentLower.match(new RegExp(queryLower, "g")) || []).length
+    score += Math.min(contentMatches * 5, 40)
+
+    // Category bonus
+    if (result.category && result.category.toLowerCase().includes(queryLower)) score += 20
+
+    // Tags bonus
+    if (result.tags && result.tags.some((tag: string) => tag.toLowerCase().includes(queryLower))) score += 15
+
+    return score
+  }
+
+  // Handle search input changes with debouncing
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      performSearch(searchTerm)
+    }, 300)
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchTerm])
+
   const toggleExpanded = (path: string) => {
     const newExpanded = new Set(expandedItems)
     if (newExpanded.has(path)) {
@@ -55,6 +179,38 @@ function Sidebar({ className }: SidebarProps) {
       newExpanded.add(path)
     }
     setExpandedItems(newExpanded)
+  }
+
+  const handleSearchSubmit = (query: string) => {
+    if (query.trim()) {
+      saveRecentSearch(query.trim())
+      // Navigate to full search page for comprehensive results
+      window.location.href = `/search?q=${encodeURIComponent(query.trim())}`
+    }
+  }
+
+  const clearSearch = () => {
+    setSearchTerm("")
+    setSearchResults([])
+    setShowSearchResults(false)
+    searchInputRef.current?.focus()
+  }
+
+  const highlightText = (text: string, query: string) => {
+    if (!query.trim()) return text
+
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi")
+    const parts = text.split(regex)
+
+    return parts.map((part, index) =>
+      regex.test(part) ? (
+        <mark key={index} className="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded">
+          {part}
+        </mark>
+      ) : (
+        part
+      ),
+    )
   }
 
   const filterItems = (items: DocItem[], term: string): DocItem[] => {
@@ -119,25 +275,185 @@ function Sidebar({ className }: SidebarProps) {
     )
   }
 
-  const filteredStructure = filterItems(docStructure, searchTerm)
+  const filteredStructure = showSearchResults ? [] : filterItems(docStructure, searchTerm)
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      <div className="p-4 border-b">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search documentation..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+    <div className={cn("flex flex-col h-full bg-background border-r", className)}>
+      {/* Enhanced Search Header */}
+      <div className="p-4 border-b bg-muted/30">
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              ref={searchInputRef}
+              placeholder="Search across all documentation..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleSearchSubmit(searchTerm)
+                }
+                if (e.key === "Escape") {
+                  clearSearch()
+                }
+              }}
+              className="pl-10 pr-10 h-10 bg-background"
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearSearch}
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+
+          {/* Search Status */}
+          {isSearching && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+              <span>Searching...</span>
+            </div>
+          )}
+
+          {/* Recent Searches */}
+          {!searchTerm && !showSearchResults && recentSearches.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recent Searches</div>
+              <div className="flex flex-wrap gap-1">
+                {recentSearches.map((recent, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSearchTerm(recent)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    {recent}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-2">
-        <div className="py-4 space-y-1">{filteredStructure.map((item) => renderDocItem(item))}</div>
+      <ScrollArea className="flex-1">
+        {/* Search Results */}
+        {showSearchResults && (
+          <div className="p-4 space-y-4">
+            {searchResults.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">
+                    {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSearchSubmit(searchTerm)}
+                    className="text-xs"
+                  >
+                    View all <ArrowRight className="w-3 h-3 ml-1" />
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  {searchResults.map((result) => (
+                    <Card key={result.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <Link
+                          href={result.url}
+                          className="block space-y-2"
+                          onClick={() => saveRecentSearch(searchTerm)}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="font-medium text-sm leading-tight line-clamp-2">
+                              {highlightText(result.title, searchTerm)}
+                            </h4>
+                            {result.read_time && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                                <Clock className="w-3 h-3" />
+                                <span>{result.read_time}m</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
+                            {highlightText(result.excerpt, searchTerm)}
+                          </p>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap gap-1">
+                              {result.category && (
+                                <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                                  {result.category}
+                                </Badge>
+                              )}
+                              {result.tags?.slice(0, 2).map((tag) => (
+                                <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0.5">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {result.file_path.split("/").pop()?.replace(".md", "")}
+                            </div>
+                          </div>
+                        </Link>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </>
+            ) : searchTerm && !isSearching ? (
+              <div className="text-center py-8 space-y-3">
+                <div className="text-muted-foreground">
+                  <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No results found for "{searchTerm}"</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => handleSearchSubmit(searchTerm)} className="text-xs">
+                  Search all documentation <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* Navigation Tree */}
+        {!showSearchResults && (
+          <div className="p-4 space-y-1">
+            {filteredStructure.length > 0 ? (
+              filteredStructure.map((item) => renderDocItem(item))
+            ) : searchTerm ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No navigation items match "{searchTerm}"</p>
+              </div>
+            ) : (
+              docStructure.map((item) => renderDocItem(item))
+            )}
+          </div>
+        )}
       </ScrollArea>
+
+      {/* Search Tips Footer */}
+      {searchTerm && (
+        <div className="p-4 border-t bg-muted/30">
+          <div className="text-xs text-muted-foreground space-y-1">
+            <div className="flex items-center gap-2">
+              <kbd className="px-1.5 py-0.5 text-xs bg-background border rounded">Enter</kbd>
+              <span>Full search</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <kbd className="px-1.5 py-0.5 text-xs bg-background border rounded">Esc</kbd>
+              <span>Clear search</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
