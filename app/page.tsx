@@ -12,50 +12,50 @@ const documentationSections = [
     title: "GRA Core Platform Introduction",
     description: "Get started with GRA Core Platform fundamentals and core concepts.",
     icon: Book,
-    href: "/docs/gcp-5.7/01_GRA_Core_Platform Introduction/introduction",
+    href: "/docs/introduction",
     color: "bg-blue-500",
   },
   {
     title: "User Guide",
     description: "Complete guide to using GRA Core Platform with step-by-step instructions.",
     icon: Users,
-    href: "/docs/gcp-5.7/02_User Guide/user-guide",
+    href: "/docs/user-guide",
     color: "bg-green-500",
   },
   {
     title: "API Reference",
     description: "Comprehensive API documentation with examples and authentication guides.",
     icon: Code,
-    href: "/docs/gcp-5.7/03_API Reference/api-reference",
+    href: "/docs/api-reference",
     color: "bg-purple-500",
   },
   {
     title: "Examples & Tutorials",
     description: "Real-world examples and step-by-step tutorials for common use cases.",
     icon: Layers,
-    href: "/docs/gcp-5.7/04_Examples & Tutorials/basic-setup",
+    href: "/docs/examples",
     color: "bg-orange-500",
   },
   {
     title: "Development Guide",
     description: "Development workflows, contribution guidelines, and advanced topics.",
     icon: Wrench,
-    href: "/docs/gcp-5.7/05_Development Guide/security-best-practices",
+    href: "/docs/development",
     color: "bg-cyan-500",
   },
   {
     title: "GCP Features Indepth",
     description: "Deep dive into GRA Core Platform Features and Implementations.",
     icon: Database,
-    href: "/docs/gcp-5.7/06_GCP Feature InDepth/cloud-functions",
+    href: "/docs/architecture",
     color: "bg-indigo-500",
   },
 ]
 
 const seeAlsoLinks = [
-  { title: "Getting Started", href: "/docs/gcp-5.7/02_User Guide/Local_setup/getting-started" },
-  { title: "API Reference", href: "/docs/gcp-5.7/03_API Reference/api-reference" },
-  { title: "Changelog", href: "/docs/gcp-5.7/changelog" },
+  { title: "Getting Started", href: "/docs/getting-started" },
+  { title: "API Reference", href: "/docs/api" },
+  { title: "Changelog", href: "/docs/changelog" },
 ]
 
 export default function HomePage() {
@@ -124,7 +124,7 @@ export default function HomePage() {
               size="lg"
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
-              <Link href="/docs/gcp-5.7/02_User Guide/Local_setup/getting-started">
+              <Link href="/docs/quick-start">
                 Quick Start Guide
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Link>

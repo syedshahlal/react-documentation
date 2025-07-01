@@ -8,7 +8,6 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Badge } from "@/components/ui/badge"
 import {
   Book,
   Users,
@@ -24,10 +23,7 @@ import {
   Folder,
   FileText,
   Loader2,
-  Clock,
-  Tag,
 } from "lucide-react"
-import type { NavigationItem } from "@/lib/navigation-config"
 
 // Icon mapping for dynamic icons
 const iconMap = {
@@ -43,6 +39,14 @@ const iconMap = {
   Search,
 }
 
+interface NavItem {
+  title: string
+  href?: string
+  icon: string
+  type: "file" | "folder"
+  items?: NavItem[]
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const [expandedSections, setExpandedSections] = useState<string[]>([])
@@ -50,7 +54,7 @@ export function Sidebar() {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [navigation, setNavigation] = useState<NavigationItem[]>([])
+  const [navigation, setNavigation] = useState<NavItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -59,21 +63,22 @@ export function Sidebar() {
     const fetchNavigation = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch("/api/navigation")
+        const response = await fetch("/api/docs-structure")
         if (!response.ok) {
-          throw new Error("Failed to fetch navigation")
+          throw new Error("Failed to fetch docs structure")
         }
         const data = await response.json()
-        setNavigation(data.navigation)
+        setNavigation(data)
 
         // Auto-expand all folders by default
-        const expandedFolders = extractFolderIds(data.navigation)
+        const expandedFolders = extractFolderNames(data)
         setExpandedSections(expandedFolders)
 
         setError(null)
       } catch (err) {
         console.error("Error fetching navigation:", err)
         setError("Failed to load navigation")
+        // Fallback to empty navigation
         setNavigation([])
       } finally {
         setIsLoading(false)
@@ -83,30 +88,30 @@ export function Sidebar() {
     fetchNavigation()
   }, [])
 
-  // Extract all folder IDs for auto-expansion
-  const extractFolderIds = (items: NavigationItem[]): string[] => {
-    const folderIds: string[] = []
+  // Extract all folder names for auto-expansion
+  const extractFolderNames = (items: NavItem[]): string[] => {
+    const folderNames: string[] = []
 
-    const traverse = (navItems: NavigationItem[]) => {
+    const traverse = (navItems: NavItem[]) => {
       navItems.forEach((item) => {
         if (item.type === "folder") {
-          folderIds.push(item.id)
-          if (item.children) {
-            traverse(item.children)
+          folderNames.push(item.title)
+          if (item.items) {
+            traverse(item.items)
           }
         }
       })
     }
 
     traverse(items)
-    return folderIds
+    return folderNames
   }
 
-  const toggleSection = (id: string) => {
-    setExpandedSections((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]))
+  const toggleSection = (title: string) => {
+    setExpandedSections((prev) => (prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title]))
   }
 
-  const searchContent = async (query: string) => {
+  const searchContent = (query: string) => {
     if (!query.trim()) {
       setSearchResults([])
       setIsSearching(false)
@@ -114,15 +119,48 @@ export function Sidebar() {
     }
 
     setIsSearching(true)
+    const results: any[] = []
+    const queryLower = query.toLowerCase()
 
-    try {
-      const response = await fetch(`/api/navigation/search?q=${encodeURIComponent(query)}&limit=10`)
-      const data = await response.json()
-      setSearchResults(data.results || [])
-    } catch (error) {
-      console.error("Search error:", error)
-      setSearchResults([])
+    // Recursive function to search through nested navigation
+    const searchNavigation = (items: NavItem[], sectionPath: string[] = []) => {
+      items.forEach((item) => {
+        if (item.type === "folder" && item.items) {
+          searchNavigation(item.items, [...sectionPath, item.title])
+        } else if (item.type === "file" && item.title.toLowerCase().includes(queryLower)) {
+          results.push({
+            ...item,
+            section: sectionPath.length > 0 ? sectionPath.join(" > ") : "Root",
+            type: "navigation",
+            snippet: `Found in ${sectionPath.length > 0 ? sectionPath.join(" > ") : "root"} navigation`,
+          })
+        }
+      })
     }
+
+    // Search through navigation items
+    searchNavigation(navigation)
+
+    // Remove duplicates and sort by relevance
+    const uniqueResults = results.filter(
+      (result, index, self) => index === self.findIndex((r) => r.href === result.href),
+    )
+
+    // Sort by relevance (exact title matches first)
+    uniqueResults.sort((a, b) => {
+      const aExact = a.title.toLowerCase() === queryLower
+      const bExact = b.title.toLowerCase() === queryLower
+      const aStarts = a.title.toLowerCase().startsWith(queryLower)
+      const bStarts = b.title.toLowerCase().startsWith(queryLower)
+
+      if (aExact && !bExact) return -1
+      if (!aExact && bExact) return 1
+      if (aStarts && !bStarts) return -1
+      if (!aStarts && bStarts) return 1
+      return a.title.localeCompare(b.title)
+    })
+
+    setSearchResults(uniqueResults)
   }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,41 +176,39 @@ export function Sidebar() {
   }
 
   // Recursive component to render navigation items
-  const NavigationItem = ({ item, level = 0 }: { item: NavigationItem; level?: number }) => {
+  const NavigationItem = ({ item, level = 0 }: { item: NavItem; level?: number }) => {
     const IconComponent = iconMap[item.icon as keyof typeof iconMap] || FileText
 
     if (item.type === "folder") {
       return (
-        <div key={item.id} style={{ marginLeft: `${level * 12}px` }}>
+        <div key={item.title} style={{ marginLeft: `${level * 12}px` }}>
           <Button
             variant="ghost"
             className="w-full justify-between p-2 h-auto font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
-            onClick={() => toggleSection(item.id)}
+            onClick={() => toggleSection(item.title)}
           >
             <div className="flex items-center">
               <IconComponent className="w-4 h-4 mr-2" />
               {item.title}
             </div>
-            {expandedSections.includes(item.id) ? (
+            {expandedSections.includes(item.title) ? (
               <ChevronDown className="w-4 h-4" />
             ) : (
               <ChevronRight className="w-4 h-4" />
             )}
           </Button>
 
-          {expandedSections.includes(item.id) && item.children && (
+          {expandedSections.includes(item.title) && item.items && (
             <div className="mt-1 space-y-1">
-              {item.children
-                .filter((child) => child.visible !== false)
-                .sort((a, b) => (a.order || 0) - (b.order || 0))
-                .map((subItem, index) => (
-                  <NavigationItem key={`${subItem.id}-${index}`} item={subItem} level={level + 1} />
-                ))}
+              {item.items.map((subItem, index) => (
+                <NavigationItem key={`${subItem.title}-${index}`} item={subItem} level={level + 1} />
+              ))}
             </div>
           )}
         </div>
       )
-    } else if (item.type === "file") {
+    } else {
+      // File item
       const isActive = pathname === item.href
 
       return (
@@ -188,24 +224,18 @@ export function Sidebar() {
             style={{ marginLeft: `${level * 12}px` }}
             onClick={() => setIsMobileOpen(false)}
           >
-            <div className="flex items-center w-full">
-              <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="truncate">{item.title}</div>
-              </div>
-            </div>
+            <IconComponent className="w-4 h-4 mr-2" />
+            {item.title}
           </Button>
         </Link>
       )
     }
-
-    return null
   }
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="p-4 pt-6 border-b border-slate-200 dark:border-slate-700">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -254,7 +284,7 @@ export function Sidebar() {
                 Search Results ({searchResults.length})
               </h3>
               {searchResults.map((result, index) => {
-                const IconComponent = iconMap[result.metadata?.icon as keyof typeof iconMap] || FileText
+                const IconComponent = iconMap[result.icon as keyof typeof iconMap] || Search
                 return (
                   <Link key={index} href={result.href || "#"}>
                     <div
@@ -268,30 +298,12 @@ export function Sidebar() {
                         <IconComponent className="w-4 h-4 mt-0.5 text-slate-500 dark:text-slate-400 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-slate-900 dark:text-slate-100 text-sm">{result.title}</div>
-                          {result.metadata?.description && (
-                            <div className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-2">
-                              {result.metadata.description}
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{result.section}</div>
+                          {result.snippet && (
+                            <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
+                              {result.snippet}
                             </div>
                           )}
-                          <div className="flex items-center space-x-2 mt-2">
-                            {result.metadata?.difficulty && (
-                              <Badge variant="outline" className="text-xs px-1 py-0">
-                                {result.metadata.difficulty}
-                              </Badge>
-                            )}
-                            {result.metadata?.estimatedReadTime && (
-                              <div className="flex items-center text-xs text-muted-foreground">
-                                <Clock className="w-3 h-3 mr-1" />
-                                {result.metadata.estimatedReadTime}min
-                              </div>
-                            )}
-                            {result.metadata?.tags && result.metadata.tags.length > 0 && (
-                              <div className="flex items-center text-xs text-muted-foreground">
-                                <Tag className="w-3 h-3 mr-1" />
-                                {result.metadata.tags.slice(0, 2).join(", ")}
-                              </div>
-                            )}
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -318,12 +330,9 @@ export function Sidebar() {
           ) : (
             // Default Navigation
             <div className="space-y-1">
-              {navigation
-                .filter((item) => item.visible !== false)
-                .sort((a, b) => (a.order || 0) - (b.order || 0))
-                .map((item, index) => (
-                  <NavigationItem key={`${item.id}-${index}`} item={item} />
-                ))}
+              {navigation.map((item, index) => (
+                <NavigationItem key={`${item.title}-${index}`} item={item} />
+              ))}
             </div>
           )}
         </div>
