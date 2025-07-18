@@ -812,10 +812,10 @@ def main():
     """Main entry point for the script"""
     parser = argparse.ArgumentParser(description='Analyze Python repository for API documentation')
     parser.add_argument('repo_path', help='Path to the Python repository')
-    parser.add_argument('-o', '--output', help='Output JSON file path', default='python_docs.json')
+    parser.add_argument('-o', '--output', help='Output file path', default='python_docs')
     parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
-    parser.add_argument('--format', choices=['json', 'markdown'], default='json', 
-                       help='Output format (json or markdown)')
+    parser.add_argument('--format', choices=['json', 'mdx'], default='json', 
+                       help='Output format (json or mdx)')
     
     args = parser.parse_args()
     
@@ -828,22 +828,23 @@ def main():
         documentation = analyzer.analyze_repository()
         
         if args.format == 'json':
-            with open(args.output, 'w', encoding='utf-8') as f:
+            output_file = args.output if args.output.endswith('.json') else f"{args.output}.json"
+            with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(documentation, f, indent=2, ensure_ascii=False)
             
             if args.verbose:
-                print(f"Documentation saved to: {args.output}")
+                print(f"Documentation saved to: {output_file}")
                 print(f"Summary: {documentation['summary']}")
         
-        elif args.format == 'markdown':
-            markdown_output = generate_markdown_docs(documentation)
-            markdown_file = args.output.replace('.json', '.md')
+        elif args.format == 'mdx':
+            mdx_output = generate_mdx_docs(documentation)
+            mdx_file = args.output if args.output.endswith('.mdx') else f"{args.output}.mdx"
             
-            with open(markdown_file, 'w', encoding='utf-8') as f:
-                f.write(markdown_output)
+            with open(mdx_file, 'w', encoding='utf-8') as f:
+                f.write(mdx_output)
             
             if args.verbose:
-                print(f"Markdown documentation saved to: {markdown_file}")
+                print(f"MDX documentation saved to: {mdx_file}")
         
     except Exception as e:
         print(f"Error: {e}")
@@ -851,95 +852,336 @@ def main():
             traceback.print_exc()
         sys.exit(1)
 
-def generate_markdown_docs(documentation: Dict[str, Any]) -> str:
-    """Generate markdown documentation from the analysis results"""
-    md_lines = []
+def generate_mdx_docs(documentation: Dict[str, Any]) -> str:
+    """Generate MDX documentation from the analysis results"""
+    mdx_lines = []
     
-    # Header
-    md_lines.append(f"# API Documentation")
-    md_lines.append(f"")
-    md_lines.append(f"**Repository:** {documentation['repository_path']}")
-    md_lines.append(f"**Generated:** {documentation['analyzed_at']}")
-    md_lines.append(f"")
+    # MDX Header with metadata
+    mdx_lines.append("---")
+    mdx_lines.append(f"title: 'API Documentation'")
+    mdx_lines.append(f"description: 'Auto-generated Python API documentation'")
+    mdx_lines.append(f"generated_at: '{documentation['analyzed_at']}'")
+    mdx_lines.append(f"repository: '{documentation['repository_path']}'")
+    mdx_lines.append("---")
+    mdx_lines.append("")
     
-    # Summary
+    # Import statements for MDX components
+    mdx_lines.append("import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'")
+    mdx_lines.append("import { Badge } from '@/components/ui/badge'")
+    mdx_lines.append("import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'")
+    mdx_lines.append("import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'")
+    mdx_lines.append("import { Alert, AlertDescription } from '@/components/ui/alert'")
+    mdx_lines.append("")
+    
+    # Title and description
+    mdx_lines.append(f"# 🐍 Python API Documentation")
+    mdx_lines.append("")
+    mdx_lines.append(f"<Alert>")
+    mdx_lines.append(f"  <AlertDescription>")
+    mdx_lines.append(f"    **Repository:** `{documentation['repository_path']}`<br/>")
+    mdx_lines.append(f"    **Generated:** {documentation['analyzed_at']}")
+    mdx_lines.append(f"  </AlertDescription>")
+    mdx_lines.append(f"</Alert>")
+    mdx_lines.append("")
+    
+    # Summary section
     summary = documentation['summary']
-    md_lines.append(f"## Summary")
-    md_lines.append(f"")
-    md_lines.append(f"- **Packages:** {summary['total_packages']}")
-    md_lines.append(f"- **Modules:** {summary['total_modules']}")
-    md_lines.append(f"- **Classes:** {summary['total_classes']}")
-    md_lines.append(f"- **Functions:** {summary['total_functions']}")
-    md_lines.append(f"- **Methods:** {summary['total_methods']}")
-    md_lines.append(f"")
+    mdx_lines.append("## 📊 Overview")
+    mdx_lines.append("")
+    mdx_lines.append("<div className='grid grid-cols-2 md:grid-cols-5 gap-4 mb-6'>")
+    mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-blue-600'>{summary['total_packages']}</div><div className='text-sm text-muted-foreground'>Packages</div></CardContent></Card>")
+    mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-green-600'>{summary['total_modules']}</div><div className='text-sm text-muted-foreground'>Modules</div></CardContent></Card>")
+    mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-purple-600'>{summary['total_classes']}</div><div className='text-sm text-muted-foreground'>Classes</div></CardContent></Card>")
+    mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-orange-600'>{summary['total_functions']}</div><div className='text-sm text-muted-foreground'>Functions</div></CardContent></Card>")
+    mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-red-600'>{summary['total_methods']}</div><div className='text-sm text-muted-foreground'>Methods</div></CardContent></Card>")
+    mdx_lines.append("</div>")
+    mdx_lines.append("")
     
-    # Packages
+    # Package list
+    if summary['package_names']:
+        mdx_lines.append("### 📦 Discovered Packages")
+        mdx_lines.append("")
+        mdx_lines.append("<div className='flex flex-wrap gap-2 mb-6'>")
+        for pkg_name in summary['package_names']:
+            mdx_lines.append(f"  <Badge variant='outline'>{pkg_name}</Badge>")
+        mdx_lines.append("</div>")
+        mdx_lines.append("")
+    
+    # Packages documentation
+    mdx_lines.append("## 📚 API Reference")
+    mdx_lines.append("")
+    
     for package in documentation['packages']:
-        md_lines.append(f"## Package: {package['name']}")
-        md_lines.append(f"")
+        mdx_lines.append(f"### Package: `{package['name']}`")
+        mdx_lines.append("")
+        
+        # Package info card
+        mdx_lines.append("<Card className='mb-6'>")
+        mdx_lines.append("  <CardHeader>")
+        mdx_lines.append(f"    <CardTitle className='flex items-center gap-2'>")
+        mdx_lines.append(f"      📦 {package['name']}")
+        if package['version']:
+            mdx_lines.append(f"      <Badge>{package['version']}</Badge>")
+        mdx_lines.append(f"    </CardTitle>")
         
         if package['docstring']['summary']:
-            md_lines.append(f"{package['docstring']['summary']}")
-            md_lines.append(f"")
+            mdx_lines.append(f"    <CardDescription>{_escape_mdx(package['docstring']['summary'])}</CardDescription>")
         
-        if package['version']:
-            md_lines.append(f"**Version:** {package['version']}")
-        if package['author']:
-            md_lines.append(f"**Author:** {package['author']}")
-        if package['license']:
-            md_lines.append(f"**License:** {package['license']}")
+        mdx_lines.append("  </CardHeader>")
         
-        md_lines.append(f"")
+        if package['author'] or package['license'] or package['docstring']['description']:
+            mdx_lines.append("  <CardContent>")
+            
+            if package['docstring']['description']:
+                mdx_lines.append(f"    <p className='mb-4'>{_escape_mdx(package['docstring']['description'])}</p>")
+            
+            if package['author'] or package['license']:
+                mdx_lines.append("    <div className='flex gap-4 text-sm text-muted-foreground'>")
+                if package['author']:
+                    mdx_lines.append(f"      <span>**Author:** {package['author']}</span>")
+                if package['license']:
+                    mdx_lines.append(f"      <span>**License:** {package['license']}</span>")
+                mdx_lines.append("    </div>")
+            
+            mdx_lines.append("  </CardContent>")
+        
+        mdx_lines.append("</Card>")
+        mdx_lines.append("")
         
         # Modules
-        for module in package['modules']:
-            md_lines.append(f"### Module: {module['name']}")
-            md_lines.append(f"")
+        if package['modules']:
+            mdx_lines.append("<Tabs defaultValue='modules' className='mb-8'>")
+            mdx_lines.append("  <TabsList>")
+            mdx_lines.append("    <TabsTrigger value='modules'>Modules</TabsTrigger>")
+            if any(module['classes'] for module in package['modules']):
+                mdx_lines.append("    <TabsTrigger value='classes'>Classes</TabsTrigger>")
+            if any(module['functions'] for module in package['modules']):
+                mdx_lines.append("    <TabsTrigger value='functions'>Functions</TabsTrigger>")
+            mdx_lines.append("  </TabsList>")
+            mdx_lines.append("")
             
-            if module['docstring']['summary']:
-                md_lines.append(f"{module['docstring']['summary']}")
-                md_lines.append(f"")
+            # Modules tab
+            mdx_lines.append("  <TabsContent value='modules'>")
+            mdx_lines.append("    <Accordion type='single' collapsible>")
             
-            # Classes
-            for cls in module['classes']:
-                md_lines.append(f"#### Class: {cls['name']}")
-                md_lines.append(f"")
+            for i, module in enumerate(package['modules']):
+                mdx_lines.append(f"      <AccordionItem value='module-{i}'>")
+                mdx_lines.append(f"        <AccordionTrigger>")
+                mdx_lines.append(f"          <div className='flex items-center gap-2'>")
+                mdx_lines.append(f"            📄 <code>{module['name']}.py</code>")
+                mdx_lines.append(f"            <div className='flex gap-1'>")
+                if module['classes']:
+                    mdx_lines.append(f"              <Badge variant='secondary' className='text-xs'>{len(module['classes'])} classes</Badge>")
+                if module['functions']:
+                    mdx_lines.append(f"              <Badge variant='secondary' className='text-xs'>{len(module['functions'])} functions</Badge>")
+                mdx_lines.append(f"            </div>")
+                mdx_lines.append(f"          </div>")
+                mdx_lines.append(f"        </AccordionTrigger>")
+                mdx_lines.append(f"        <AccordionContent>")
                 
-                if cls['docstring']['summary']:
-                    md_lines.append(f"{cls['docstring']['summary']}")
-                    md_lines.append(f"")
+                if module['docstring']['summary']:
+                    mdx_lines.append(f"          <p className='mb-4'>{_escape_mdx(module['docstring']['summary'])}</p>")
                 
-                if cls['inheritance']:
-                    md_lines.append(f"**Inherits from:** {', '.join(cls['inheritance'])}")
-                    md_lines.append(f"")
-                
-                # Methods
-                for method in cls['methods']:
-                    md_lines.append(f"##### {method['name']}")
-                    md_lines.append(f"")
-                    md_lines.append(f"```python")
-                    md_lines.append(f"{method['signature']}")
-                    md_lines.append(f"```")
-                    md_lines.append(f"")
+                # Module classes and functions summary
+                if module['classes'] or module['functions']:
+                    mdx_lines.append("          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>")
                     
-                    if method['docstring']['summary']:
-                        md_lines.append(f"{method['docstring']['summary']}")
-                        md_lines.append(f"")
-            
-            # Functions
-            for func in module['functions']:
-                md_lines.append(f"#### Function: {func['name']}")
-                md_lines.append(f"")
-                md_lines.append(f"```python")
-                md_lines.append(f"{func['signature']}")
-                md_lines.append(f"```")
-                md_lines.append(f"")
+                    if module['classes']:
+                        mdx_lines.append("            <div>")
+                        mdx_lines.append("              <h5 className='font-semibold mb-2'>Classes</h5>")
+                        mdx_lines.append("              <ul className='space-y-1'>")
+                        for cls in module['classes']:
+                            mdx_lines.append(f"                <li><code>{cls['name']}</code></li>")
+                        mdx_lines.append("              </ul>")
+                        mdx_lines.append("            </div>")
+                    
+                    if module['functions']:
+                        mdx_lines.append("            <div>")
+                        mdx_lines.append("              <h5 className='font-semibold mb-2'>Functions</h5>")
+                        mdx_lines.append("              <ul className='space-y-1'>")
+                        for func in module['functions']:
+                            mdx_lines.append(f"                <li><code>{func['name']}()</code></li>")
+                        mdx_lines.append("              </ul>")
+                        mdx_lines.append("            </div>")
+                    
+                    mdx_lines.append("          </div>")
                 
-                if func['docstring']['summary']:
-                    md_lines.append(f"{func['docstring']['summary']}")
-                    md_lines.append(f"")
+                mdx_lines.append(f"        </AccordionContent>")
+                mdx_lines.append(f"      </AccordionItem>")
+            
+            mdx_lines.append("    </Accordion>")
+            mdx_lines.append("  </TabsContent>")
+            
+            # Classes tab
+            if any(module['classes'] for module in package['modules']):
+                mdx_lines.append("  <TabsContent value='classes'>")
+                mdx_lines.append("    <div className='space-y-6'>")
+                
+                for module in package['modules']:
+                    for cls in module['classes']:
+                        mdx_lines.append("      <Card>")
+                        mdx_lines.append("        <CardHeader>")
+                        mdx_lines.append(f"          <CardTitle className='flex items-center gap-2'>")
+                        mdx_lines.append(f"            🏗️ <code>{cls['name']}</code>")
+                        if cls['inheritance']:
+                            mdx_lines.append(f"            <Badge variant='outline'>extends {', '.join(cls['inheritance'])}</Badge>")
+                        if cls['is_abstract']:
+                            mdx_lines.append(f"            <Badge variant='destructive'>abstract</Badge>")
+                        mdx_lines.append(f"          </CardTitle>")
+                        
+                        if cls['docstring']['summary']:
+                            mdx_lines.append(f"          <CardDescription>{_escape_mdx(cls['docstring']['summary'])}</CardDescription>")
+                        
+                        mdx_lines.append("        </CardHeader>")
+                        mdx_lines.append("        <CardContent>")
+                        
+                        if cls['docstring']['description']:
+                            mdx_lines.append(f"          <p className='mb-4'>{_escape_mdx(cls['docstring']['description'])}</p>")
+                        
+                        # Methods and properties
+                        if cls['methods'] or cls['properties']:
+                            mdx_lines.append("          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>")
+                            
+                            if cls['methods']:
+                                mdx_lines.append("            <div>")
+                                mdx_lines.append("              <h6 className='font-semibold mb-2'>Methods</h6>")
+                                mdx_lines.append("              <div className='space-y-2'>")
+                                for method in cls['methods'][:5]:  # Show first 5 methods
+                                    privacy_badge = ""
+                                    if method['is_private']:
+                                        privacy_badge = "<Badge variant='outline' className='text-xs'>private</Badge>"
+                                    elif method['is_protected']:
+                                        privacy_badge = "<Badge variant='outline' className='text-xs'>protected</Badge>"
+                                    
+                                    mdx_lines.append(f"                <div className='flex items-center gap-2'>")
+                                    mdx_lines.append(f"                  <code className='text-sm'>{method['name']}()</code>")
+                                    if privacy_badge:
+                                        mdx_lines.append(f"                  {privacy_badge}")
+                                    mdx_lines.append(f"                </div>")
+                                
+                                if len(cls['methods']) > 5:
+                                    mdx_lines.append(f"                <p className='text-sm text-muted-foreground'>... and {len(cls['methods']) - 5} more methods</p>")
+                                
+                                mdx_lines.append("              </div>")
+                                mdx_lines.append("            </div>")
+                            
+                            if cls['properties']:
+                                mdx_lines.append("            <div>")
+                                mdx_lines.append("              <h6 className='font-semibold mb-2'>Properties</h6>")
+                                mdx_lines.append("              <div className='space-y-1'>")
+                                for prop in cls['properties']:
+                                    mdx_lines.append(f"                <code className='text-sm'>{prop['name']}</code>")
+                                mdx_lines.append("              </div>")
+                                mdx_lines.append("            </div>")
+                            
+                            mdx_lines.append("          </div>")
+                        
+                        mdx_lines.append("        </CardContent>")
+                        mdx_lines.append("      </Card>")
+                
+                mdx_lines.append("    </div>")
+                mdx_lines.append("  </TabsContent>")
+            
+            # Functions tab
+            if any(module['functions'] for module in package['modules']):
+                mdx_lines.append("  <TabsContent value='functions'>")
+                mdx_lines.append("    <div className='space-y-4'>")
+                
+                for module in package['modules']:
+                    for func in module['functions']:
+                        mdx_lines.append("      <Card>")
+                        mdx_lines.append("        <CardHeader>")
+                        mdx_lines.append(f"          <CardTitle className='flex items-center gap-2'>")
+                        mdx_lines.append(f"            ⚡ <code>{func['name']}()</code>")
+                        if func['is_async']:
+                            mdx_lines.append(f"            <Badge variant='secondary'>async</Badge>")
+                        if func['is_private']:
+                            mdx_lines.append(f"            <Badge variant='outline'>private</Badge>")
+                        elif func['is_protected']:
+                            mdx_lines.append(f"            <Badge variant='outline'>protected</Badge>")
+                        mdx_lines.append(f"          </CardTitle>")
+                        
+                        if func['docstring']['summary']:
+                            mdx_lines.append(f"          <CardDescription>{_escape_mdx(func['docstring']['summary'])}</CardDescription>")
+                        
+                        mdx_lines.append("        </CardHeader>")
+                        mdx_lines.append("        <CardContent>")
+                        
+                        # Function signature
+                        mdx_lines.append("          <div className='mb-4'>")
+                        mdx_lines.append("            <h6 className='font-semibold mb-2'>Signature</h6>")
+                        mdx_lines.append(f"            <pre className='bg-muted p-2 rounded text-sm overflow-x-auto'><code>{_escape_mdx(func['signature'])}</code></pre>")
+                        mdx_lines.append("          </div>")
+                        
+                        if func['docstring']['description']:
+                            mdx_lines.append(f"          <p className='mb-4'>{_escape_mdx(func['docstring']['description'])}</p>")
+                        
+                        # Parameters and return info
+                        if func['docstring']['parameters'] or func['docstring']['returns']:
+                            mdx_lines.append("          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>")
+                            
+                            if func['docstring']['parameters']:
+                                mdx_lines.append("            <div>")
+                                mdx_lines.append("              <h6 className='font-semibold mb-2'>Parameters</h6>")
+                                mdx_lines.append("              <div className='space-y-2'>")
+                                for param in func['docstring']['parameters']:
+                                    mdx_lines.append(f"                <div>")
+                                    mdx_lines.append(f"                  <code className='text-sm font-medium'>{param['name']}</code>")
+                                    if param['type_hint']:
+                                        mdx_lines.append(f"                  <Badge variant='outline' className='ml-2 text-xs'>{param['type_hint']}</Badge>")
+                                    if param['description']:
+                                        mdx_lines.append(f"                  <p className='text-sm text-muted-foreground mt-1'>{_escape_mdx(param['description'])}</p>")
+                                    mdx_lines.append(f"                </div>")
+                                mdx_lines.append("              </div>")
+                                mdx_lines.append("            </div>")
+                            
+                            if func['docstring']['returns']:
+                                mdx_lines.append("            <div>")
+                                mdx_lines.append("              <h6 className='font-semibold mb-2'>Returns</h6>")
+                                if func['docstring']['returns']['type_hint']:
+                                    mdx_lines.append(f"              <Badge variant='outline' className='mb-2'>{func['docstring']['returns']['type_hint']}</Badge>")
+                                if func['docstring']['returns']['description']:
+                                    mdx_lines.append(f"              <p className='text-sm'>{_escape_mdx(func['docstring']['returns']['description'])}</p>")
+                                mdx_lines.append("            </div>")
+                            
+                            mdx_lines.append("          </div>")
+                        
+                        mdx_lines.append("        </CardContent>")
+                        mdx_lines.append("      </Card>")
+                
+                mdx_lines.append("    </div>")
+                mdx_lines.append("  </TabsContent>")
+            
+            mdx_lines.append("</Tabs>")
+        
+        mdx_lines.append("")
     
-    return '\n'.join(md_lines)
+    # Footer
+    mdx_lines.append("---")
+    mdx_lines.append("")
+    mdx_lines.append("<Alert>")
+    mdx_lines.append("  <AlertDescription>")
+    mdx_lines.append("    📝 This documentation was automatically generated from Python source code.<br/>")
+    mdx_lines.append(f"    🕒 Generated on {documentation['analyzed_at']}")
+    mdx_lines.append("  </AlertDescription>")
+    mdx_lines.append("</Alert>")
+    
+    return '\n'.join(mdx_lines)
+
+def _escape_mdx(text: str) -> str:
+    """Escape special characters for MDX"""
+    if not text:
+        return ""
+    
+    # Escape curly braces and other MDX special characters
+    text = text.replace('{', '\\{').replace('}', '\\}')
+    text = text.replace('<', '&lt;').replace('>', '&gt;')
+    
+    # Handle backticks in text
+    if '`' in text:
+        text = text.replace('`', '\\`')
+    
+    return text
 
 if __name__ == '__main__':
     main()
