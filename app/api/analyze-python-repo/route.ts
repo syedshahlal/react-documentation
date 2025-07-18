@@ -5,7 +5,7 @@ import fs from "fs/promises"
 
 export async function POST(request: NextRequest) {
   try {
-    const { repoPath, format = "json", options = {} } = await request.json()
+    const { repoPath, format = "mdx", options = {} } = await request.json()
 
     if (!repoPath) {
       return NextResponse.json({ error: "Repository path is required" }, { status: 400 })
@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
 
     return new Promise((resolve) => {
       const pythonProcess = spawn("python3", [
-        path.join(process.cwd(), "scripts", "python_doc_analyzer.py"),
+        path.join(process.cwd(), "scripts", "python_api_docs.py"),
         repoPath,
-        "-o",
+        "--output",
         outputFile,
         "--format",
         format,
@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
               success: true,
               stdout,
               format,
+              output_file: path.basename(outputFile),
             }
 
             if (format === "json") {
@@ -123,19 +124,20 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   return NextResponse.json({
-    message: "Python Repository Analyzer API",
+    message: "🐍 Python API Documentation Generator",
+    description: "Analyze Python repositories and generate beautiful MDX documentation",
     usage: "POST with { repoPath: '/path/to/repo', format: 'json|mdx' }",
     formats: {
       json: "Returns structured JSON data for programmatic use",
-      mdx: "Returns ready-to-use MDX content for documentation sites",
+      mdx: "Returns ready-to-use MDX content with interactive components",
     },
     features: [
-      "Analyzes Python packages, modules, classes, and functions",
-      "Extracts docstrings in Google, NumPy, and Sphinx formats",
-      "Generates comprehensive API documentation",
-      "Supports inheritance analysis and method categorization",
-      "Extracts type hints and function signatures",
-      "Creates interactive MDX components for modern documentation sites",
+      "📦 Analyzes Python packages, modules, classes, and functions",
+      "📝 Extracts docstrings in Google, NumPy, and Sphinx formats",
+      "🎨 Generates interactive MDX components",
+      "🔍 Supports inheritance analysis and method categorization",
+      "⚡ Extracts type hints and function signatures",
+      "📱 Creates responsive documentation for modern sites",
     ],
     examples: {
       json_request: {
@@ -147,5 +149,10 @@ export async function GET() {
         format: "mdx",
       },
     },
+    command_line_usage: [
+      "python scripts/python_api_docs.py /path/to/repo",
+      "python scripts/python_api_docs.py ./my_package --output my_docs.mdx",
+      "python scripts/python_api_docs.py ~/projects/flask --format json --verbose",
+    ],
   })
 }
