@@ -1,158 +1,128 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { spawn } from "child_process"
+import { unlink } from "fs/promises"
 import path from "path"
-import fs from "fs/promises"
 
 export async function POST(request: NextRequest) {
   try {
-    const { repoPath, format = "mdx", options = {} } = await request.json()
+    const { repoPath, format = "mdx" } = await request.json()
 
     if (!repoPath) {
       return NextResponse.json({ error: "Repository path is required" }, { status: 400 })
     }
 
-    // Validate format
-    if (!["json", "mdx"].includes(format)) {
-      return NextResponse.json({ error: "Format must be 'json' or 'mdx'" }, { status: 400 })
-    }
-
-    // Validate that the path exists and is accessible
-    try {
-      await fs.access(repoPath)
-    } catch {
-      return NextResponse.json({ error: "Repository path does not exist or is not accessible" }, { status: 400 })
-    }
-
-    // Generate unique filename for this analysis
+    // Create a unique temporary file name
     const timestamp = Date.now()
-    const fileExtension = format === "mdx" ? "mdx" : "json"
-    const outputFile = path.join(process.cwd(), "temp", `python_docs_${timestamp}.${fileExtension}`)
+    const outputFile = path.join(process.cwd(), "temp", `analysis_${timestamp}.${format}`)
 
     // Ensure temp directory exists
-    await fs.mkdir(path.dirname(outputFile), { recursive: true })
+    const fs = require("fs")
+    const tempDir = path.join(process.cwd(), "temp")
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true })
+    }
 
-    return new Promise((resolve) => {
-      const pythonProcess = spawn("python3", [
-        path.join(process.cwd(), "scripts", "python_api_docs.py"),
-        repoPath,
-        "--output",
-        outputFile,
-        "--format",
-        format,
-        "--verbose",
-      ])
+    // Run the Python analysis script
+    const pythonProcess = spawn("python3", [
+      path.join(process.cwd(), "scripts", "python_api_docs.py"),
+      repoPath,
+      "--format",
+      format,
+      "--output",
+      outputFile,
+      "--verbose",
+    ])
 
-      let stdout = ""
-      let stderr = ""
+    let stdout = ""
+    let stderr = ""
 
-      pythonProcess.stdout.on("data", (data) => {
-        stdout += data.toString()
-      })
+    pythonProcess.stdout.on("data", (data) => {
+      stdout += data.toString()
+    })
 
-      pythonProcess.stderr.on("data", (data) => {
-        stderr += data.toString()
-      })
+    pythonProcess.stderr.on("data", (data) => {
+      stderr += data.toString()
+    })
 
-      pythonProcess.on("close", async (code) => {
-        if (code === 0) {
-          try {
-            // Read the generated documentation
-            const docsContent = await fs.readFile(outputFile, "utf-8")
+    // Wait for the process to complete
+    const exitCode = await new Promise((resolve) => {
+      pythonProcess.on("close", resolve)
+    })
 
-            const responseData: any = {
-              success: true,
-              stdout,
-              format,
-              output_file: path.basename(outputFile),
-            }
+    if (exitCode !== 0) {
+      console.error("Python script error:", stderr)
+      return NextResponse.json(
+        {
+          error: "Failed to analyze repository",
+          details: stderr,
+          stdout,
+        },
+        { status: 500 },
+      )
+    }
 
-            if (format === "json") {
-              responseData.documentation = JSON.parse(docsContent)
-            } else {
-              responseData.mdx_content = docsContent
-            }
+    // Read the generated file
+    const fs2 = require("fs").promises
+    let content
 
-            // Clean up temp file
-            await fs.unlink(outputFile).catch(() => {})
+    try {
+      content = await fs2.readFile(outputFile, "utf-8")
+    } catch (readError) {
+      console.error("Error reading output file:", readError)
+      return NextResponse.json({ error: "Failed to read generated documentation" }, { status: 500 })
+    }
 
-            resolve(NextResponse.json(responseData))
-          } catch (error) {
-            resolve(
-              NextResponse.json(
-                {
-                  error: "Failed to read generated documentation",
-                  details: error,
-                  format,
-                },
-                { status: 500 },
-              ),
-            )
-          }
-        } else {
-          resolve(
-            NextResponse.json(
-              {
-                error: "Documentation analysis failed",
-                stderr,
-                stdout,
-                format,
-              },
-              { status: 500 },
-            ),
-          )
-        }
-      })
+    // Clean up the temporary file
+    try {
+      await unlink(outputFile)
+    } catch (unlinkError) {
+      console.warn("Warning: Could not delete temporary file:", unlinkError)
+    }
 
-      // Set a timeout to prevent hanging
-      setTimeout(() => {
-        pythonProcess.kill()
-        resolve(
-          NextResponse.json(
-            {
-              error: "Analysis timeout - process took too long",
-              format,
-            },
-            { status: 408 },
-          ),
-        )
-      }, 300000) // 5 minute timeout
+    // Parse JSON content if format is json
+    let responseData
+    if (format === "json") {
+      try {
+        responseData = JSON.parse(content)
+      } catch (parseError) {
+        console.error("Error parsing JSON:", parseError)
+        return NextResponse.json({ error: "Failed to parse generated JSON" }, { status: 500 })
+      }
+    } else {
+      responseData = { content, format: "mdx" }
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: responseData,
+      logs: stdout,
+      message: "Repository analyzed successfully with imported API documentation",
     })
   } catch (error) {
-    return NextResponse.json({ error: "Invalid request", details: error }, { status: 400 })
+    console.error("API error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function GET() {
   return NextResponse.json({
-    message: "🐍 Python API Documentation Generator",
-    description: "Analyze Python repositories and generate beautiful MDX documentation",
-    usage: "POST with { repoPath: '/path/to/repo', format: 'json|mdx' }",
-    formats: {
-      json: "Returns structured JSON data for programmatic use",
-      mdx: "Returns ready-to-use MDX content with interactive components",
+    message: "Python Repository Analyzer API",
+    description:
+      "POST to this endpoint with repoPath to analyze Python repositories and extract API documentation including imported modules",
+    usage: {
+      method: "POST",
+      body: {
+        repoPath: "string (required) - Path to Python repository",
+        format: 'string (optional) - "json" or "mdx", defaults to "mdx"',
+      },
     },
     features: [
-      "📦 Analyzes Python packages, modules, classes, and functions",
-      "📝 Extracts docstrings in Google, NumPy, and Sphinx formats",
-      "🎨 Generates interactive MDX components",
-      "🔍 Supports inheritance analysis and method categorization",
-      "⚡ Extracts type hints and function signatures",
-      "📱 Creates responsive documentation for modern sites",
-    ],
-    examples: {
-      json_request: {
-        repoPath: "/path/to/python/repo",
-        format: "json",
-      },
-      mdx_request: {
-        repoPath: "/path/to/python/repo",
-        format: "mdx",
-      },
-    },
-    command_line_usage: [
-      "python scripts/python_api_docs.py /path/to/repo",
-      "python scripts/python_api_docs.py ./my_package --output my_docs.mdx",
-      "python scripts/python_api_docs.py ~/projects/flask --format json --verbose",
+      "Analyzes Python packages, modules, classes, and functions",
+      "Follows import statements to extract imported API documentation",
+      "Generates interactive MDX documentation",
+      "Supports multiple docstring formats (Google, NumPy, Sphinx)",
+      "Extracts signatures, parameters, return types, and examples",
+      "Provides JSON data for programmatic use",
     ],
   })
 }

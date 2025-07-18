@@ -2,7 +2,7 @@
 """
 Complete Python API Documentation Generator
 A single script that analyzes Python repositories and generates MDX documentation
-with deep import analysis, similar to Sphinx, pydoc, and autodoc.
+with interactive components, following imports to extract complete API information.
 """
 
 import os
@@ -13,14 +13,17 @@ import inspect
 import argparse
 import importlib
 import importlib.util
+import types
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, Set, Tuple
 import re
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict
 from datetime import datetime
 import traceback
-import pkgutil
-import types
+import warnings
+
+# Suppress warnings during import analysis
+warnings.filterwarnings('ignore')
 
 @dataclass
 class DocParameter:
@@ -55,25 +58,46 @@ class ParsedDocstring:
     """Represents a parsed docstring with structured information"""
     summary: str = ""
     description: str = ""
-    parameters: List[DocParameter] = field(default_factory=list)
+    parameters: List[DocParameter] = None
     returns: Optional[DocReturn] = None
-    raises: List[DocException] = field(default_factory=list)
-    examples: List[DocExample] = field(default_factory=list)
-    notes: List[str] = field(default_factory=list)
-    see_also: List[str] = field(default_factory=list)
-    attributes: List[DocParameter] = field(default_factory=list)
+    raises: List[DocException] = None
+    examples: List[DocExample] = None
+    notes: List[str] = None
+    see_also: List[str] = None
+    attributes: List[DocParameter] = None
+    
+    def __post_init__(self):
+        if self.parameters is None:
+            self.parameters = []
+        if self.raises is None:
+            self.raises = []
+        if self.examples is None:
+            self.examples = []
+        if self.notes is None:
+            self.notes = []
+        if self.see_also is None:
+            self.see_also = []
+        if self.attributes is None:
+            self.attributes = []
 
 @dataclass
-class ImportedItem:
-    """Represents an imported module, class, or function"""
+class ImportedAPI:
+    """Represents an imported API element"""
     name: str
     module_path: str
-    item_type: str  # 'module', 'class', 'function', 'constant'
+    type: str  # 'function', 'class', 'module', 'constant'
     docstring: ParsedDocstring
     signature: Optional[str] = None
-    source_file: Optional[str] = None
+    source_location: Optional[str] = None
     is_builtin: bool = False
-    is_third_party: bool = False
+    methods: List['FunctionDoc'] = None
+    attributes: List[DocParameter] = None
+    
+    def __post_init__(self):
+        if self.methods is None:
+            self.methods = []
+        if self.attributes is None:
+            self.attributes = []
 
 @dataclass
 class FunctionDoc:
@@ -88,8 +112,12 @@ class FunctionDoc:
     is_staticmethod: bool = False
     is_private: bool = False
     is_protected: bool = False
-    decorators: List[str] = field(default_factory=list)
+    decorators: List[str] = None
     source_file: str = ""
+    
+    def __post_init__(self):
+        if self.decorators is None:
+            self.decorators = []
 
 @dataclass
 class ClassDoc:
@@ -97,12 +125,22 @@ class ClassDoc:
     name: str
     docstring: ParsedDocstring
     line_number: int
-    methods: List[FunctionDoc] = field(default_factory=list)
-    properties: List[FunctionDoc] = field(default_factory=list)
-    class_variables: List[DocParameter] = field(default_factory=list)
-    inheritance: List[str] = field(default_factory=list)
+    methods: List[FunctionDoc] = None
+    properties: List[FunctionDoc] = None
+    class_variables: List[DocParameter] = None
+    inheritance: List[str] = None
     is_abstract: bool = False
     source_file: str = ""
+    
+    def __post_init__(self):
+        if self.methods is None:
+            self.methods = []
+        if self.properties is None:
+            self.properties = []
+        if self.class_variables is None:
+            self.class_variables = []
+        if self.inheritance is None:
+            self.inheritance = []
 
 @dataclass
 class ModuleDoc:
@@ -110,11 +148,23 @@ class ModuleDoc:
     name: str
     file_path: str
     docstring: ParsedDocstring
-    classes: List[ClassDoc] = field(default_factory=list)
-    functions: List[FunctionDoc] = field(default_factory=list)
-    constants: List[DocParameter] = field(default_factory=list)
-    imported_items: List[ImportedItem] = field(default_factory=list)  # Changed from imports
-    submodules: List[str] = field(default_factory=list)
+    classes: List[ClassDoc] = None
+    functions: List[FunctionDoc] = None
+    constants: List[DocParameter] = None
+    imported_apis: List[ImportedAPI] = None
+    submodules: List[str] = None
+    
+    def __post_init__(self):
+        if self.classes is None:
+            self.classes = []
+        if self.functions is None:
+            self.functions = []
+        if self.constants is None:
+            self.constants = []
+        if self.imported_apis is None:
+            self.imported_apis = []
+        if self.submodules is None:
+            self.submodules = []
 
 @dataclass
 class PackageDoc:
@@ -122,12 +172,17 @@ class PackageDoc:
     name: str
     path: str
     docstring: ParsedDocstring
-    modules: List[ModuleDoc] = field(default_factory=list)
-    subpackages: List['PackageDoc'] = field(default_factory=list)
-    imported_items: List[ImportedItem] = field(default_factory=list)  # Package-level imports
+    modules: List[ModuleDoc] = None
+    subpackages: List['PackageDoc'] = None
     version: Optional[str] = None
     author: Optional[str] = None
     license: Optional[str] = None
+    
+    def __post_init__(self):
+        if self.modules is None:
+            self.modules = []
+        if self.subpackages is None:
+            self.subpackages = []
 
 class DocstringParser:
     """Parses docstrings in various formats (Google, NumPy, Sphinx)"""
@@ -407,511 +462,269 @@ class DocstringParser:
         
         return examples
 
-class ImportResolver:
-    """Resolves and analyzes imported modules"""
+class ImportAnalyzer:
+    """Analyzes and follows imports to extract API documentation"""
     
-    def __init__(self, base_path: Path, analyzed_modules: Set[str] = None):
-        self.base_path = base_path
-        self.analyzed_modules = analyzed_modules or set()
+    def __init__(self, repo_path: str, max_depth: int = 3):
+        self.repo_path = Path(repo_path).resolve()
+        self.max_depth = max_depth
+        self.analyzed_modules: Set[str] = set()
         self.docstring_parser = DocstringParser()
-        self.sys_paths = sys.path.copy()
         
-        # Add the base path to sys.path for imports
-        if str(base_path) not in self.sys_paths:
-            self.sys_paths.insert(0, str(base_path))
+        # Add repo path to sys.path for imports
+        if str(self.repo_path) not in sys.path:
+            sys.path.insert(0, str(self.repo_path))
     
-    def resolve_imports(self, import_nodes: List[Union[ast.Import, ast.ImportFrom]], 
-                       current_module_path: Path) -> List[ImportedItem]:
-        """Resolve import statements to actual imported items with documentation"""
-        imported_items = []
+    def analyze_imports(self, import_nodes: List[Union[ast.Import, ast.ImportFrom]], 
+                       current_module_path: str) -> List[ImportedAPI]:
+        """Analyze import statements and extract API documentation"""
+        imported_apis = []
         
         for node in import_nodes:
             try:
                 if isinstance(node, ast.Import):
-                    items = self._resolve_import(node, current_module_path)
+                    imported_apis.extend(self._analyze_import(node, current_module_path))
                 elif isinstance(node, ast.ImportFrom):
-                    items = self._resolve_from_import(node, current_module_path)
-                else:
-                    continue
-                
-                imported_items.extend(items)
-                
+                    imported_apis.extend(self._analyze_import_from(node, current_module_path))
             except Exception as e:
-                # If we can't resolve an import, create a basic item
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        imported_items.append(ImportedItem(
-                            name=alias.name,
-                            module_path="",
-                            item_type="module",
-                            docstring=ParsedDocstring(summary=f"Could not resolve import: {e}"),
-                            is_builtin=True
-                        ))
+                # Continue on import errors
                 continue
         
-        return imported_items
+        return imported_apis
     
-    def _resolve_import(self, node: ast.Import, current_module_path: Path) -> List[ImportedItem]:
-        """Resolve 'import module' statements"""
-        items = []
+    def _analyze_import(self, node: ast.Import, current_module_path: str) -> List[ImportedAPI]:
+        """Analyze 'import module' statements"""
+        imported_apis = []
         
         for alias in node.names:
             module_name = alias.name
             
             try:
-                # Try to find and load the module
-                module_info = self._find_module(module_name, current_module_path)
-                if module_info:
-                    item = self._analyze_imported_module(module_info, module_name)
-                    items.append(item)
-                else:
-                    # Create placeholder for unresolvable module
-                    items.append(ImportedItem(
-                        name=module_name,
-                        module_path="",
-                        item_type="module",
-                        docstring=ParsedDocstring(summary="External or system module"),
-                        is_builtin=True
-                    ))
-            
-            except Exception as e:
-                items.append(ImportedItem(
-                    name=module_name,
-                    module_path="",
-                    item_type="module",
-                    docstring=ParsedDocstring(summary=f"Import resolution failed: {str(e)}"),
-                    is_builtin=True
-                ))
+                module = self._safe_import_module(module_name)
+                if module:
+                    api = self._extract_module_api(module, module_name)
+                    if api:
+                        imported_apis.append(api)
+            except Exception:
+                continue
         
-        return items
+        return imported_apis
     
-    def _resolve_from_import(self, node: ast.ImportFrom, current_module_path: Path) -> List[ImportedItem]:
-        """Resolve 'from module import item' statements"""
-        items = []
-        module_name = node.module or ""
+    def _analyze_import_from(self, node: ast.ImportFrom, current_module_path: str) -> List[ImportedAPI]:
+        """Analyze 'from module import name' statements"""
+        imported_apis = []
         
-        # Handle relative imports
-        if node.level > 0:
-            module_name = self._resolve_relative_import(module_name, node.level, current_module_path)
+        if not node.module:
+            return imported_apis
         
-        if not module_name:
-            return items
+        module_name = node.module
         
         try:
-            # Find the source module
-            module_info = self._find_module(module_name, current_module_path)
-            if not module_info:
-                # Create placeholders for unresolvable imports
-                for alias in node.names:
-                    items.append(ImportedItem(
-                        name=alias.name,
-                        module_path=module_name,
-                        item_type="unknown",
-                        docstring=ParsedDocstring(summary="External or system import"),
-                        is_third_party=True
-                    ))
-                return items
+            module = self._safe_import_module(module_name)
+            if not module:
+                return imported_apis
             
-            # Load the module and extract specific items
             for alias in node.names:
-                item_name = alias.name
+                import_name = alias.name
                 
-                if item_name == '*':
+                if import_name == '*':
                     # Handle 'from module import *'
-                    all_items = self._get_all_module_items(module_info)
-                    items.extend(all_items)
+                    api = self._extract_module_api(module, module_name)
+                    if api:
+                        imported_apis.append(api)
                 else:
                     # Handle specific imports
-                    item = self._analyze_imported_item(module_info, item_name, module_name)
-                    if item:
-                        items.append(item)
-        
-        except Exception as e:
-            # Create placeholder items
-            for alias in node.names:
-                items.append(ImportedItem(
-                    name=alias.name,
-                    module_path=module_name,
-                    item_type="unknown",
-                    docstring=ParsedDocstring(summary=f"Import failed: {str(e)}"),
-                    is_third_party=True
-                ))
-        
-        return items
-    
-    def _find_module(self, module_name: str, current_module_path: Path) -> Optional[Dict[str, Any]]:
-        """Find a module by name and return its information"""
-        
-        # First try to find it as a local module
-        local_module = self._find_local_module(module_name, current_module_path)
-        if local_module:
-            return local_module
-        
-        # Try to import it using importlib
-        try:
-            spec = importlib.util.find_spec(module_name)
-            if spec and spec.origin:
-                return {
-                    'spec': spec,
-                    'path': Path(spec.origin),
-                    'is_package': spec.submodule_search_locations is not None,
-                    'is_builtin': spec.origin == 'built-in',
-                    'is_local': self._is_local_module(Path(spec.origin) if spec.origin != 'built-in' else None)
-                }
-        except (ImportError, AttributeError, ValueError):
-            pass
-        
-        return None
-    
-    def _find_local_module(self, module_name: str, current_module_path: Path) -> Optional[Dict[str, Any]]:
-        """Find a module within the current project"""
-        parts = module_name.split('.')
-        
-        # Start from the base path
-        search_path = self.base_path
-        
-        for i, part in enumerate(parts):
-            # Try as a package (directory with __init__.py)
-            package_path = search_path / part
-            if package_path.is_dir() and (package_path / '__init__.py').exists():
-                search_path = package_path
-                if i == len(parts) - 1:  # Last part
-                    return {
-                        'path': package_path / '__init__.py',
-                        'is_package': True,
-                        'is_builtin': False,
-                        'is_local': True
-                    }
-            
-            # Try as a module (python file)
-            module_path = search_path / f"{part}.py"
-            if module_path.exists():
-                if i == len(parts) - 1:  # Last part
-                    return {
-                        'path': module_path,
-                        'is_package': False,
-                        'is_builtin': False,
-                        'is_local': True
-                    }
-            
-            # If we can't find this part, stop searching
-            else:
-                break
-        
-        return None
-    
-    def _is_local_module(self, module_path: Optional[Path]) -> bool:
-        """Check if a module is part of the local project"""
-        if not module_path:
-            return False
-        
-        try:
-            return self.base_path in module_path.parents or module_path == self.base_path
-        except (OSError, ValueError):
-            return False
-    
-    def _resolve_relative_import(self, module_name: str, level: int, current_module_path: Path) -> str:
-        """Resolve relative imports like 'from ..module import item'"""
-        try:
-            # Get the current package path
-            current_package = current_module_path.parent
-            
-            # Go up 'level' directories
-            for _ in range(level - 1):
-                current_package = current_package.parent
-                if current_package == self.base_path.parent:
-                    break
-            
-            # Convert path to module name
-            relative_path = current_package.relative_to(self.base_path)
-            package_parts = list(relative_path.parts) if relative_path != Path('.') else []
-            
-            if module_name:
-                package_parts.append(module_name)
-            
-            return '.'.join(package_parts)
-            
-        except (ValueError, OSError):
-            return module_name
-    
-    def _analyze_imported_module(self, module_info: Dict[str, Any], module_name: str) -> ImportedItem:
-        """Analyze an imported module and extract its documentation"""
-        
-        if module_info.get('is_builtin'):
-            return ImportedItem(
-                name=module_name,
-                module_path=module_name,
-                item_type="module",
-                docstring=ParsedDocstring(summary="Built-in Python module"),
-                is_builtin=True
-            )
-        
-        module_path = module_info['path']
-        
-        # Avoid analyzing the same module multiple times
-        if str(module_path) in self.analyzed_modules:
-            return ImportedItem(
-                name=module_name,
-                module_path=str(module_path),
-                item_type="module",
-                docstring=ParsedDocstring(summary="Already analyzed module"),
-                source_file=str(module_path),
-                is_local=module_info.get('is_local', False)
-            )
-        
-        self.analyzed_modules.add(str(module_path))
-        
-        try:
-            # Read and parse the module
-            with open(module_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            tree = ast.parse(content)
-            
-            # Extract module docstring
-            module_docstring = ParsedDocstring()
-            if (tree.body and isinstance(tree.body[0], ast.Expr) and 
-                isinstance(tree.body[0].value, ast.Constant) and 
-                isinstance(tree.body[0].value.value, str)):
-                module_docstring = self.docstring_parser.parse(tree.body[0].value.value)
-            
-            return ImportedItem(
-                name=module_name,
-                module_path=str(module_path),
-                item_type="module",
-                docstring=module_docstring,
-                source_file=str(module_path),
-                is_local=module_info.get('is_local', False),
-                is_third_party=not module_info.get('is_local', False) and not module_info.get('is_builtin', False)
-            )
-            
-        except Exception as e:
-            return ImportedItem(
-                name=module_name,
-                module_path=str(module_path),
-                item_type="module",
-                docstring=ParsedDocstring(summary=f"Error analyzing module: {str(e)}"),
-                source_file=str(module_path),
-                is_local=module_info.get('is_local', False)
-            )
-    
-    def _analyze_imported_item(self, module_info: Dict[str, Any], item_name: str, module_name: str) -> Optional[ImportedItem]:
-        """Analyze a specific item imported from a module"""
-        
-        if module_info.get('is_builtin'):
-            return ImportedItem(
-                name=item_name,
-                module_path=module_name,
-                item_type="unknown",
-                docstring=ParsedDocstring(summary=f"Built-in item from {module_name}"),
-                is_builtin=True
-            )
-        
-        module_path = module_info['path']
-        
-        try:
-            # Read and parse the module
-            with open(module_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            tree = ast.parse(content)
-            
-            # Find the specific item in the module
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ClassDef) and node.name == item_name:
-                    # Extract class docstring
-                    docstring = ParsedDocstring()
-                    if (node.body and isinstance(node.body[0], ast.Expr) and 
-                        isinstance(node.body[0].value, ast.Constant) and 
-                        isinstance(node.body[0].value.value, str)):
-                        docstring = self.docstring_parser.parse(node.body[0].value.value)
-                    
-                    return ImportedItem(
-                        name=item_name,
-                        module_path=module_name,
-                        item_type="class",
-                        docstring=docstring,
-                        source_file=str(module_path),
-                        is_local=module_info.get('is_local', False),
-                        is_third_party=not module_info.get('is_local', False) and not module_info.get('is_builtin', False)
-                    )
-                
-                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == item_name:
-                    # Extract function docstring and signature
-                    docstring = ParsedDocstring()
-                    if (node.body and isinstance(node.body[0], ast.Expr) and 
-                        isinstance(node.body[0].value, ast.Constant) and 
-                        isinstance(node.body[0].value.value, str)):
-                        docstring = self.docstring_parser.parse(node.body[0].value.value)
-                    
-                    signature = self._generate_signature(node)
-                    
-                    return ImportedItem(
-                        name=item_name,
-                        module_path=module_name,
-                        item_type="function",
-                        docstring=docstring,
-                        signature=signature,
-                        source_file=str(module_path),
-                        is_local=module_info.get('is_local', False),
-                        is_third_party=not module_info.get('is_local', False) and not module_info.get('is_builtin', False)
-                    )
-                
-                elif isinstance(node, ast.Assign):
-                    # Check for constants/variables
-                    for target in node.targets:
-                        if isinstance(target, ast.Name) and target.id == item_name:
-                            return ImportedItem(
-                                name=item_name,
-                                module_path=module_name,
-                                item_type="constant",
-                                docstring=ParsedDocstring(summary=f"Constant from {module_name}"),
-                                source_file=str(module_path),
-                                is_local=module_info.get('is_local', False),
-                                is_third_party=not module_info.get('is_local', False) and not module_info.get('is_builtin', False)
-                            )
-            
-            # If we couldn't find the item, create a placeholder
-            return ImportedItem(
-                name=item_name,
-                module_path=module_name,
-                item_type="unknown",
-                docstring=ParsedDocstring(summary=f"Item from {module_name} (not found in source)"),
-                source_file=str(module_path),
-                is_local=module_info.get('is_local', False),
-                is_third_party=not module_info.get('is_local', False) and not module_info.get('is_builtin', False)
-            )
-            
-        except Exception as e:
-            return ImportedItem(
-                name=item_name,
-                module_path=module_name,
-                item_type="unknown",
-                docstring=ParsedDocstring(summary=f"Error analyzing item: {str(e)}"),
-                source_file=str(module_path) if module_path else "",
-                is_local=module_info.get('is_local', False)
-            )
-    
-    def _get_all_module_items(self, module_info: Dict[str, Any]) -> List[ImportedItem]:
-        """Get all items from a module for 'from module import *'"""
-        items = []
-        
-        if module_info.get('is_builtin'):
-            return [ImportedItem(
-                name="*",
-                module_path=module_info.get('path', ''),
-                item_type="module",
-                docstring=ParsedDocstring(summary="All items from built-in module"),
-                is_builtin=True
-            )]
-        
-        module_path = module_info['path']
-        
-        try:
-            # Read and parse the module
-            with open(module_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            tree = ast.parse(content)
-            
-            # Extract all public items (not starting with _)
-            for node in tree.body:
-                if isinstance(node, ast.ClassDef) and not node.name.startswith('_'):
-                    docstring = ParsedDocstring()
-                    if (node.body and isinstance(node.body[0], ast.Expr) and 
-                        isinstance(node.body[0].value, ast.Constant) and 
-                        isinstance(node.body[0].value.value, str)):
-                        docstring = self.docstring_parser.parse(node.body[0].value.value)
-                    
-                    items.append(ImportedItem(
-                        name=node.name,
-                        module_path=str(module_path),
-                        item_type="class",
-                        docstring=docstring,
-                        source_file=str(module_path),
-                        is_local=module_info.get('is_local', False)
-                    ))
-                
-                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith('_'):
-                    docstring = ParsedDocstring()
-                    if (node.body and isinstance(node.body[0], ast.Expr) and 
-                        isinstance(node.body[0].value, ast.Constant) and 
-                        isinstance(node.body[0].value.value, str)):
-                        docstring = self.docstring_parser.parse(node.body[0].value.value)
-                    
-                    signature = self._generate_signature(node)
-                    
-                    items.append(ImportedItem(
-                        name=node.name,
-                        module_path=str(module_path),
-                        item_type="function",
-                        docstring=docstring,
-                        signature=signature,
-                        source_file=str(module_path),
-                        is_local=module_info.get('is_local', False)
-                    ))
+                    try:
+                        obj = getattr(module, import_name, None)
+                        if obj:
+                            api = self._extract_object_api(obj, import_name, module_name)
+                            if api:
+                                imported_apis.append(api)
+                    except Exception:
+                        continue
         
         except Exception:
             pass
         
-        return items
+        return imported_apis
     
-    def _generate_signature(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> str:
-        """Generate function signature string"""
-        args = []
+    def _safe_import_module(self, module_name: str) -> Optional[types.ModuleType]:
+        """Safely import a module"""
+        if module_name in self.analyzed_modules:
+            return None
         
-        # Regular arguments
-        for arg in node.args.args:
-            arg_str = arg.arg
-            if arg.annotation:
-                try:
-                    arg_str += f": {ast.unparse(arg.annotation)}"
-                except:
-                    arg_str += ": Any"
-            args.append(arg_str)
+        self.analyzed_modules.add(module_name)
         
-        # Default arguments
-        defaults = node.args.defaults
-        if defaults:
-            num_defaults = len(defaults)
-            for i, default in enumerate(defaults):
-                arg_index = len(args) - num_defaults + i
-                if arg_index >= 0:
-                    try:
-                        args[arg_index] += f" = {ast.unparse(default)}"
-                    except:
-                        args[arg_index] += " = ..."
-        
-        # *args
-        if node.args.vararg:
-            vararg = f"*{node.args.vararg.arg}"
-            if node.args.vararg.annotation:
-                try:
-                    vararg += f": {ast.unparse(node.args.vararg.annotation)}"
-                except:
-                    vararg += ": Any"
-            args.append(vararg)
-        
-        # **kwargs
-        if node.args.kwarg:
-            kwarg = f"**{node.args.kwarg.arg}"
-            if node.args.kwarg.annotation:
-                try:
-                    kwarg += f": {ast.unparse(node.args.kwarg.annotation)}"
-                except:
-                    kwarg += ": Any"
-            args.append(kwarg)
-        
-        signature = f"{node.name}({', '.join(args)})"
-        
-        # Return annotation
-        if node.returns:
+        try:
+            # Try standard import first
+            return importlib.import_module(module_name)
+        except ImportError:
             try:
-                signature += f" -> {ast.unparse(node.returns)}"
-            except:
-                signature += " -> Any"
+                # Try importing from current package
+                spec = importlib.util.find_spec(module_name)
+                if spec and spec.origin:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    return module
+            except Exception:
+                pass
         
-        return signature
+        return None
+    
+    def _extract_module_api(self, module: types.ModuleType, module_name: str) -> Optional[ImportedAPI]:
+        """Extract API documentation from a module"""
+        try:
+            docstring = inspect.getdoc(module) or ""
+            parsed_docstring = self.docstring_parser.parse(docstring)
+            
+            # Get module location
+            source_location = None
+            try:
+                source_location = inspect.getfile(module)
+            except (TypeError, OSError):
+                pass
+            
+            # Check if it's a builtin module
+            is_builtin = hasattr(module, '__file__') and module.__file__ is None
+            
+            return ImportedAPI(
+                name=module_name,
+                module_path=module_name,
+                type='module',
+                docstring=parsed_docstring,
+                source_location=source_location,
+                is_builtin=is_builtin
+            )
+        
+        except Exception:
+            return None
+    
+    def _extract_object_api(self, obj: Any, obj_name: str, module_name: str) -> Optional[ImportedAPI]:
+        """Extract API documentation from an imported object"""
+        try:
+            obj_type = self._get_object_type(obj)
+            docstring = inspect.getdoc(obj) or ""
+            parsed_docstring = self.docstring_parser.parse(docstring)
+            
+            # Get signature for functions and methods
+            signature = None
+            if obj_type in ['function', 'method']:
+                try:
+                    sig = inspect.signature(obj)
+                    signature = f"{obj_name}{sig}"
+                except (ValueError, TypeError):
+                    signature = f"{obj_name}(...)"
+            
+            # Get source location
+            source_location = None
+            try:
+                source_location = inspect.getfile(obj)
+            except (TypeError, OSError):
+                pass
+            
+            # For classes, extract methods and attributes
+            methods = []
+            attributes = []
+            
+            if obj_type == 'class':
+                methods = self._extract_class_methods(obj)
+                attributes = self._extract_class_attributes(obj)
+            
+            return ImportedAPI(
+                name=obj_name,
+                module_path=module_name,
+                type=obj_type,
+                docstring=parsed_docstring,
+                signature=signature,
+                source_location=source_location,
+                is_builtin=source_location is None,
+                methods=methods,
+                attributes=attributes
+            )
+        
+        except Exception:
+            return None
+    
+    def _get_object_type(self, obj: Any) -> str:
+        """Determine the type of an object"""
+        if inspect.isclass(obj):
+            return 'class'
+        elif inspect.isfunction(obj) or inspect.ismethod(obj):
+            return 'function'
+        elif inspect.ismodule(obj):
+            return 'module'
+        elif isinstance(obj, (int, float, str, bool, list, dict, tuple)):
+            return 'constant'
+        else:
+            return 'object'
+    
+    def _extract_class_methods(self, cls: type) -> List[FunctionDoc]:
+        """Extract methods from a class"""
+        methods = []
+        
+        try:
+            for name, method in inspect.getmembers(cls, predicate=inspect.isfunction):
+                if name.startswith('_') and not name.startswith('__'):
+                    continue  # Skip private methods for brevity
+                
+                try:
+                    docstring = inspect.getdoc(method) or ""
+                    parsed_docstring = self.docstring_parser.parse(docstring)
+                    
+                    # Get signature
+                    try:
+                        sig = inspect.signature(method)
+                        signature = f"{name}{sig}"
+                    except (ValueError, TypeError):
+                        signature = f"{name}(...)"
+                    
+                    method_doc = FunctionDoc(
+                        name=name,
+                        signature=signature,
+                        docstring=parsed_docstring,
+                        line_number=0,
+                        is_private=name.startswith('__') and name.endswith('__'),
+                        is_protected=name.startswith('_') and not name.startswith('__')
+                    )
+                    
+                    methods.append(method_doc)
+                
+                except Exception:
+                    continue
+        
+        except Exception:
+            pass
+        
+        return methods[:10]  # Limit to first 10 methods for performance
+    
+    def _extract_class_attributes(self, cls: type) -> List[DocParameter]:
+        """Extract attributes from a class"""
+        attributes = []
+        
+        try:
+            for name in dir(cls):
+                if name.startswith('_'):
+                    continue
+                
+                try:
+                    attr = getattr(cls, name)
+                    if not callable(attr):
+                        attr_type = type(attr).__name__
+                        attr_value = str(attr) if len(str(attr)) < 100 else f"{str(attr)[:100]}..."
+                        
+                        attributes.append(DocParameter(
+                            name=name,
+                            type_hint=attr_type,
+                            default_value=attr_value
+                        ))
+                
+                except Exception:
+                    continue
+        
+        except Exception:
+            pass
+        
+        return attributes[:10]  # Limit for performance
 
 class PythonDocAnalyzer:
     """Main analyzer class for Python documentation extraction"""
@@ -919,8 +732,8 @@ class PythonDocAnalyzer:
     def __init__(self, repo_path: str):
         self.repo_path = Path(repo_path).resolve()
         self.docstring_parser = DocstringParser()
+        self.import_analyzer = ImportAnalyzer(str(repo_path))
         self.analyzed_files = set()
-        self.analyzed_modules = set()
         
     def analyze_repository(self) -> Dict[str, Any]:
         """Analyze the entire repository and extract documentation"""
@@ -968,7 +781,6 @@ class PythonDocAnalyzer:
         version = None
         author = None
         license = None
-        package_imports = []
         
         if init_file.exists():
             try:
@@ -994,12 +806,6 @@ class PythonDocAnalyzer:
                                     author = str(node.value.value)
                                 elif target.id == '__license__' and isinstance(node.value, ast.Constant):
                                     license = str(node.value.value)
-                
-                # Analyze package-level imports
-                import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
-                if import_nodes:
-                    resolver = ImportResolver(self.repo_path, self.analyzed_modules)
-                    package_imports = resolver.resolve_imports(import_nodes, init_file)
                 
             except Exception as e:
                 print(f"Error parsing {init_file}: {e}")
@@ -1031,7 +837,6 @@ class PythonDocAnalyzer:
             docstring=package_docstring,
             modules=modules,
             subpackages=subpackages,
-            imported_items=package_imports,
             version=version,
             author=author,
             license=license
@@ -1065,10 +870,7 @@ class PythonDocAnalyzer:
         classes = []
         functions = []
         constants = []
-        imported_items = []
-        
-        # Collect import nodes
-        import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+        import_nodes = []
         
         for node in tree.body:
             if isinstance(node, ast.ClassDef):
@@ -1081,11 +883,12 @@ class PythonDocAnalyzer:
             
             elif isinstance(node, ast.Assign):
                 constants.extend(self._analyze_constants(node))
+            
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                import_nodes.append(node)
         
-        # Analyze imports and resolve them to actual documentation
-        if import_nodes:
-            resolver = ImportResolver(self.repo_path, self.analyzed_modules)
-            imported_items = resolver.resolve_imports(import_nodes, module_path)
+        # Analyze imports and extract API documentation
+        imported_apis = self.import_analyzer.analyze_imports(import_nodes, str(module_path))
         
         return ModuleDoc(
             name=module_name,
@@ -1094,7 +897,7 @@ class PythonDocAnalyzer:
             classes=classes,
             functions=functions,
             constants=constants,
-            imported_items=imported_items
+            imported_apis=imported_apis
         )
     
     def _analyze_class(self, node: ast.ClassDef, source_file: str) -> ClassDoc:
@@ -1112,10 +915,7 @@ class PythonDocAnalyzer:
             if isinstance(base, ast.Name):
                 inheritance.append(base.id)
             elif isinstance(base, ast.Attribute):
-                try:
-                    inheritance.append(ast.unparse(base))
-                except:
-                    inheritance.append(str(base))
+                inheritance.append(ast.unparse(base))
         
         # Extract methods and properties
         methods = []
@@ -1136,10 +936,7 @@ class PythonDocAnalyzer:
                 for target in item.targets:
                     if isinstance(target, ast.Name):
                         var_name = target.id
-                        try:
-                            var_value = ast.unparse(item.value) if hasattr(ast, 'unparse') else str(item.value)
-                        except:
-                            var_value = "..."
+                        var_value = ast.unparse(item.value) if hasattr(ast, 'unparse') else str(item.value)
                         class_variables.append(DocParameter(name=var_name, default_value=var_value))
         
         # Check if class is abstract
@@ -1218,10 +1015,7 @@ class PythonDocAnalyzer:
         for arg in node.args.args:
             arg_str = arg.arg
             if arg.annotation:
-                try:
-                    arg_str += f": {ast.unparse(arg.annotation)}"
-                except:
-                    arg_str += ": Any"
+                arg_str += f": {ast.unparse(arg.annotation)}"
             args.append(arg_str)
         
         # Default arguments
@@ -1231,39 +1025,27 @@ class PythonDocAnalyzer:
             for i, default in enumerate(defaults):
                 arg_index = len(args) - num_defaults + i
                 if arg_index >= 0:
-                    try:
-                        args[arg_index] += f" = {ast.unparse(default)}"
-                    except:
-                        args[arg_index] += " = ..."
+                    args[arg_index] += f" = {ast.unparse(default)}"
         
         # *args
         if node.args.vararg:
             vararg = f"*{node.args.vararg.arg}"
             if node.args.vararg.annotation:
-                try:
-                    vararg += f": {ast.unparse(node.args.vararg.annotation)}"
-                except:
-                    vararg += ": Any"
+                vararg += f": {ast.unparse(node.args.vararg.annotation)}"
             args.append(vararg)
         
         # **kwargs
         if node.args.kwarg:
             kwarg = f"**{node.args.kwarg.arg}"
             if node.args.kwarg.annotation:
-                try:
-                    kwarg += f": {ast.unparse(node.args.kwarg.annotation)}"
-                except:
-                    kwarg += ": Any"
+                kwarg += f": {ast.unparse(node.args.kwarg.annotation)}"
             args.append(kwarg)
         
         signature = f"{node.name}({', '.join(args)})"
         
         # Return annotation
         if node.returns:
-            try:
-                signature += f" -> {ast.unparse(node.returns)}"
-            except:
-                signature += " -> Any"
+            signature += f" -> {ast.unparse(node.returns)}"
         
         return signature
     
@@ -1274,10 +1056,7 @@ class PythonDocAnalyzer:
         for target in node.targets:
             if isinstance(target, ast.Name) and target.id.isupper():
                 const_name = target.id
-                try:
-                    const_value = ast.unparse(node.value) if hasattr(ast, 'unparse') else str(node.value)
-                except:
-                    const_value = "..."
+                const_value = ast.unparse(node.value) if hasattr(ast, 'unparse') else str(node.value)
                 constants.append(DocParameter(name=const_name, default_value=const_value))
         
         return constants
@@ -1293,9 +1072,11 @@ class PythonDocAnalyzer:
             for module in pkg.modules 
             for cls in module.classes
         )
-        total_imports = sum(
-            len(module.imported_items) for pkg in packages for module in pkg.modules
-        ) + sum(len(pkg.imported_items) for pkg in packages)
+        total_imported_apis = sum(
+            len(module.imported_apis) 
+            for pkg in packages 
+            for module in pkg.modules
+        )
         
         return {
             'total_packages': len(packages),
@@ -1303,7 +1084,7 @@ class PythonDocAnalyzer:
             'total_classes': total_classes,
             'total_functions': total_functions,
             'total_methods': total_methods,
-            'total_imports': total_imports,
+            'total_imported_apis': total_imported_apis,
             'package_names': [pkg.name for pkg in packages]
         }
 
@@ -1314,7 +1095,7 @@ def generate_mdx_docs(documentation: Dict[str, Any]) -> str:
     # MDX Header with metadata
     mdx_lines.append("---")
     mdx_lines.append(f"title: 'API Documentation'")
-    mdx_lines.append(f"description: 'Auto-generated Python API documentation'")
+    mdx_lines.append(f"description: 'Auto-generated Python API documentation with imported APIs'")
     mdx_lines.append(f"generated_at: '{documentation['analyzed_at']}'")
     mdx_lines.append(f"repository: '{documentation['repository_path']}'")
     mdx_lines.append("---")
@@ -1349,7 +1130,7 @@ def generate_mdx_docs(documentation: Dict[str, Any]) -> str:
     mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-purple-600'>{summary['total_classes']}</div><div className='text-sm text-muted-foreground'>Classes</div></CardContent></Card>")
     mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-orange-600'>{summary['total_functions']}</div><div className='text-sm text-muted-foreground'>Functions</div></CardContent></Card>")
     mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-red-600'>{summary['total_methods']}</div><div className='text-sm text-muted-foreground'>Methods</div></CardContent></Card>")
-    mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-indigo-600'>{summary['total_imports']}</div><div className='text-sm text-muted-foreground'>Analyzed Imports</div></CardContent></Card>")
+    mdx_lines.append(f"  <Card><CardContent className='p-4 text-center'><div className='text-2xl font-bold text-indigo-600'>{summary['total_imported_apis']}</div><div className='text-sm text-muted-foreground'>Imported APIs</div></CardContent></Card>")
     mdx_lines.append("</div>")
     mdx_lines.append("")
     
@@ -1404,63 +1185,454 @@ def generate_mdx_docs(documentation: Dict[str, Any]) -> str:
         mdx_lines.append("</Card>")
         mdx_lines.append("")
         
-        # Package tabs
-        if package['modules'] or package['imported_items']:
-            tab_count = 0
-            tabs = []
+        # Modules with enhanced tabs including imported APIs
+        if package['modules']:
+            mdx_lines.append("<Tabs defaultValue='modules' className='mb-8'>")
+            mdx_lines.append("  <TabsList>")
+            mdx_lines.append("    <TabsTrigger value='modules'>Modules</TabsTrigger>")
+            if any(module['classes'] for module in package['modules']):
+                mdx_lines.append("    <TabsTrigger value='classes'>Classes</TabsTrigger>")
+            if any(module['functions'] for module in package['modules']):
+                mdx_lines.append("    <TabsTrigger value='functions'>Functions</TabsTrigger>")
+            if any(module['imported_apis'] for module in package['modules']):
+                mdx_lines.append("    <TabsTrigger value='imported-apis'>📦 Imported APIs</TabsTrigger>")
+            mdx_lines.append("  </TabsList>")
+            mdx_lines.append("")
             
-            if package['modules']:
-                tabs.append(('modules', 'Modules'))
-                if any(module['classes'] for module in package['modules']):
-                    tabs.append(('classes', 'Classes'))
-                if any(module['functions'] for module in package['modules']):
-                    tabs.append(('functions', 'Functions'))
+            # Modules tab
+            mdx_lines.append("  <TabsContent value='modules'>")
+            mdx_lines.append("    <Accordion type='single' collapsible>")
             
-            if package['imported_items']:
-                tabs.append(('imports', 'Package Imports'))
-            
-            if tabs:
-                mdx_lines.append("<Tabs defaultValue='modules' className='mb-8'>")
-                mdx_lines.append("  <TabsList>")
-                for tab_id, tab_name in tabs:
-                    mdx_lines.append(f"    <TabsTrigger value='{tab_id}'>{tab_name}</TabsTrigger>")
-                mdx_lines.append("  </TabsList>")
-                mdx_lines.append("")
+            for i, module in enumerate(package['modules']):
+                mdx_lines.append(f"      <AccordionItem value='module-{i}'>")
+                mdx_lines.append(f"        <AccordionTrigger>")
+                mdx_lines.append(f"          <div className='flex items-center gap-2'>")
+                mdx_lines.append(f"            📄 <code>{module['name']}.py</code>")
+                mdx_lines.append(f"            <div className='flex gap-1'>")
+                if module['classes']:
+                    mdx_lines.append(f"              <Badge variant='secondary' className='text-xs'>{len(module['classes'])} classes</Badge>")
+                if module['functions']:
+                    mdx_lines.append(f"              <Badge variant='secondary' className='text-xs'>{len(module['functions'])} functions</Badge>")
+                if module['imported_apis']:
+                    mdx_lines.append(f"              <Badge variant='secondary' className='text-xs'>{len(module['imported_apis'])} imports</Badge>")
+                mdx_lines.append(f"            </div>")
+                mdx_lines.append(f"          </div>")
+                mdx_lines.append(f"        </AccordionTrigger>")
+                mdx_lines.append(f"        <AccordionContent>")
                 
-                # Modules tab
-                if ('modules', 'Modules') in tabs:
-                    mdx_lines.append("  <TabsContent value='modules'>")
-                    mdx_lines.append("    <Accordion type='single' collapsible>")
+                if module['docstring']['summary']:
+                    mdx_lines.append(f"          <p className='mb-4'>{_escape_mdx(module['docstring']['summary'])}</p>")
+                
+                # Module content summary
+                if module['classes'] or module['functions'] or module['imported_apis']:
+                    mdx_lines.append("          <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>")
                     
-                    for i, module in enumerate(package['modules']):
-                        mdx_lines.append(f"      <AccordionItem value='module-{i}'>")
-                        mdx_lines.append(f"        <AccordionTrigger>")
-                        mdx_lines.append(f"          <div className='flex items-center gap-2'>")
-                        mdx_lines.append(f"            📄 <code>{module['name']}.py</code>")
-                        mdx_lines.append(f"            <div className='flex gap-1'>")
-                        if module['classes']:
-                            mdx_lines.append(f"              <Badge variant='secondary' className='text-xs'>{len(module['classes'])} classes</Badge>")
-                        if module['functions']:
-                            mdx_lines.append(f"              <Badge variant='secondary' className='text-xs'>{len(module['functions'])} functions</Badge>")
-                        if module['imported_items']:
-                            mdx_lines.append(f"              <Badge variant='outline' className='text-xs'>{len(module['imported_items'])} imports</Badge>")
-                        mdx_lines.append(f"            </div>")
-                        mdx_lines.append(f"          </div>")
-                        mdx_lines.append(f"        </AccordionTrigger>")
-                        mdx_lines.append(f"        <AccordionContent>")
+                    if module['classes']:
+                        mdx_lines.append("            <div>")
+                        mdx_lines.append("              <h5 className='font-semibold mb-2'>Classes</h5>")
+                        mdx_lines.append("              <ul className='space-y-1'>")
+                        for cls in module['classes'][:5]:
+                            mdx_lines.append(f"                <li><code>{cls['name']}</code></li>")
+                        if len(module['classes']) > 5:
+                            mdx_lines.append(f"                <li className='text-sm text-muted-foreground'>... +{len(module['classes']) - 5} more</li>")
+                        mdx_lines.append("              </ul>")
+                        mdx_lines.append("            </div>")
+                    
+                    if module['functions']:
+                        mdx_lines.append("            <div>")
+                        mdx_lines.append("              <h5 className='font-semibold mb-2'>Functions</h5>")
+                        mdx_lines.append("              <ul className='space-y-1'>")
+                        for func in module['functions'][:5]:
+                            mdx_lines.append(f"                <li><code>{func['name']}()</code></li>")
+                        if len(module['functions']) > 5:
+                            mdx_lines.append(f"                <li className='text-sm text-muted-foreground'>... +{len(module['functions']) - 5} more</li>")
+                        mdx_lines.append("              </ul>")
+                        mdx_lines.append("            </div>")
+                    
+                    if module['imported_apis']:
+                        mdx_lines.append("            <div>")
+                        mdx_lines.append("              <h5 className='font-semibold mb-2'>Imported APIs</h5>")
+                        mdx_lines.append("              <ul className='space-y-1'>")
+                        for api in module['imported_apis'][:5]:
+                            api_type_color = {
+                                'function': 'text-blue-600',
+                                'class': 'text-green-600',
+                                'module': 'text-purple-600'
+                            }.get(api['type'], 'text-gray-600')
+                            mdx_lines.append(f"                <li className='flex items-center gap-2'>")
+                            mdx_lines.append(f"                  <code className='{api_type_color}'>{api['name']}</code>")
+                            mdx_lines.append(f"                  <Badge variant='outline' className='text-xs'>{api['type']}</Badge>")
+                            mdx_lines.append(f"                </li>")
+                        if len(module['imported_apis']) > 5:
+                            mdx_lines.append(f"                <li className='text-sm text-muted-foreground'>... +{len(module['imported_apis']) - 5} more</li>")
+                        mdx_lines.append("              </ul>")
+                        mdx_lines.append("            </div>")
+                    
+                    mdx_lines.append("          </div>")
+                
+                mdx_lines.append(f"        </AccordionContent>")
+                mdx_lines.append(f"      </AccordionItem>")
+            
+            mdx_lines.append("    </Accordion>")
+            mdx_lines.append("  </TabsContent>")
+            
+            # Imported APIs tab
+            if any(module['imported_apis'] for module in package['modules']):
+                mdx_lines.append("  <TabsContent value='imported-apis'>")
+                mdx_lines.append("    <div className='space-y-6'>")
+                
+                for module in package['modules']:
+                    if module['imported_apis']:
+                        mdx_lines.append(f"      <div>")
+                        mdx_lines.append(f"        <h4 className='font-semibold mb-4'>From module: <code>{module['name']}.py</code></h4>")
+                        mdx_lines.append("        <div className='grid gap-4'>")
                         
-                        if module['docstring']['summary']:
-                            mdx_lines.append(f"          <p className='mb-4'>{_escape_mdx(module['docstring']['summary'])}</p>")
-                        
-                        # Module items summary
-                        if module['classes'] or module['functions'] or module['imported_items']:
-                            mdx_lines.append("          <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>")
+                        for api in module['imported_apis']:
+                            mdx_lines.append("          <Card>")
+                            mdx_lines.append("            <CardHeader>")
+                            mdx_lines.append(f"              <CardTitle className='flex items-center gap-2'>")
                             
-                            if module['classes']:
+                            type_icon = {
+                                'function': '⚡',
+                                'class': '🏗️',
+                                'module': '📦',
+                                'constant': '🔧'
+                            }.get(api['type'], '📄')
+                            
+                            mdx_lines.append(f"                {type_icon} <code>{api['name']}</code>")
+                            mdx_lines.append(f"                <Badge variant='secondary'>{api['type']}</Badge>")
+                            
+                            if api['is_builtin']:
+                                mdx_lines.append(f"                <Badge variant='outline'>builtin</Badge>")
+                            
+                            mdx_lines.append(f"              </CardTitle>")
+                            
+                            if api['docstring']['summary']:
+                                mdx_lines.append(f"              <CardDescription>{_escape_mdx(api['docstring']['summary'])}</CardDescription>")
+                            
+                            mdx_lines.append("            </CardHeader>")
+                            
+                            if api['signature'] or api['docstring']['description'] or api['methods'] or api['attributes']:
+                                mdx_lines.append("            <CardContent>")
+                                
+                                # Show signature for functions
+                                if api['signature']:
+                                    mdx_lines.append("              <div className='mb-3'>")
+                                    mdx_lines.append("                <h6 className='font-semibold mb-1'>Signature</h6>")
+                                    mdx_lines.append(f"                <pre className='bg-muted p-2 rounded text-sm overflow-x-auto'><code>{_escape_mdx(api['signature'])}</code></pre>")
+                                    mdx_lines.append("              </div>")
+                                
+                                # Show description
+                                if api['docstring']['description']:
+                                    mdx_lines.append(f"              <p className='mb-3'>{_escape_mdx(api['docstring']['description'])}</p>")
+                                
+                                # Show methods for classes
+                                if api['methods']:
+                                    mdx_lines.append("              <div className='mb-3'>")
+                                    mdx_lines.append("                <h6 className='font-semibold mb-2'>Methods</h6>")
+                                    mdx_lines.append("                <div className='space-y-1'>")
+                                    for method in api['methods'][:3]:  # Show first 3 methods
+                                        mdx_lines.append(f"                  <div className='flex items-center gap-2'>")
+                                        mdx_lines.append(f"                    <code className='text-sm'>{method['name']}()</code>")
+                                        if method['docstring']['summary']:
+                                            mdx_lines.append(f"                    <span className='text-xs text-muted-foreground'>- {_escape_mdx(method['docstring']['summary'][:50])}...</span>")
+                                        mdx_lines.append(f"                  </div>")
+                                    
+                                    if len(api['methods']) > 3:
+                                        mdx_lines.append(f"                  <p className='text-sm text-muted-foreground'>... +{len(api['methods']) - 3} more methods</p>")
+                                    
+                                    mdx_lines.append("                </div>")
+                                    mdx_lines.append("              </div>")
+                                
+                                # Show attributes
+                                if api['attributes']:
+                                    mdx_lines.append("              <div>")
+                                    mdx_lines.append("                <h6 className='font-semibold mb-2'>Attributes</h6>")
+                                    mdx_lines.append("                <div className='flex flex-wrap gap-2'>")
+                                    for attr in api['attributes'][:5]:  # Show first 5 attributes
+                                        mdx_lines.append(f"                  <Badge variant='outline' className='text-xs'>{attr['name']}</Badge>")
+                                    if len(api['attributes']) > 5:
+                                        mdx_lines.append(f"                  <span className='text-xs text-muted-foreground'>+{len(api['attributes']) - 5} more</span>")
+                                    mdx_lines.append("                </div>")
+                                    mdx_lines.append("              </div>")
+                                
+                                mdx_lines.append("            </CardContent>")
+                            
+                            mdx_lines.append("          </Card>")
+                        
+                        mdx_lines.append("        </div>")
+                        mdx_lines.append(f"      </div>")
+                
+                mdx_lines.append("    </div>")
+                mdx_lines.append("  </TabsContent>")
+            
+            # Classes tab (keeping existing implementation)
+            if any(module['classes'] for module in package['modules']):
+                mdx_lines.append("  <TabsContent value='classes'>")
+                mdx_lines.append("    <div className='space-y-6'>")
+                
+                for module in package['modules']:
+                    for cls in module['classes']:
+                        mdx_lines.append("      <Card>")
+                        mdx_lines.append("        <CardHeader>")
+                        mdx_lines.append(f"          <CardTitle className='flex items-center gap-2'>")
+                        mdx_lines.append(f"            🏗️ <code>{cls['name']}</code>")
+                        if cls['inheritance']:
+                            mdx_lines.append(f"            <Badge variant='outline'>extends {', '.join(cls['inheritance'])}</Badge>")
+                        if cls['is_abstract']:
+                            mdx_lines.append(f"            <Badge variant='destructive'>abstract</Badge>")
+                        mdx_lines.append(f"          </CardTitle>")
+                        
+                        if cls['docstring']['summary']:
+                            mdx_lines.append(f"          <CardDescription>{_escape_mdx(cls['docstring']['summary'])}</CardDescription>")
+                        
+                        mdx_lines.append("        </CardHeader>")
+                        mdx_lines.append("        <CardContent>")
+                        
+                        if cls['docstring']['description']:
+                            mdx_lines.append(f"          <p className='mb-4'>{_escape_mdx(cls['docstring']['description'])}</p>")
+                        
+                        # Methods and properties
+                        if cls['methods'] or cls['properties']:
+                            mdx_lines.append("          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>")
+                            
+                            if cls['methods']:
                                 mdx_lines.append("            <div>")
-                                mdx_lines.append("              <h5 className='font-semibold mb-2'>Classes</h5>")
-                                mdx_lines.append("              <ul className='space-y-1'>")
-                                for cls in module['classes'][:3]:  # Show first 3
-                                    mdx_lines.append(f"                <li><code>{cls['name']}</code></li>")
-                                if len(module['classes']) > 3:
-                                    mdx_lines.append(f"                <li className='text-sm text-muted-fore
+                                mdx_lines.append("              <h6 className='font-semibold mb-2'>Methods</h6>")
+                                mdx_lines.append("              <div className='space-y-2'>")
+                                for method in cls['methods'][:5]:  # Show first 5 methods
+                                    privacy_badge = ""
+                                    if method['is_private']:
+                                        privacy_badge = "<Badge variant='outline' className='text-xs'>private</Badge>"
+                                    elif method['is_protected']:
+                                        privacy_badge = "<Badge variant='outline' className='text-xs'>protected</Badge>"
+                                    
+                                    mdx_lines.append(f"                <div className='flex items-center gap-2'>")
+                                    mdx_lines.append(f"                  <code className='text-sm'>{method['name']}()</code>")
+                                    if privacy_badge:
+                                        mdx_lines.append(f"                  {privacy_badge}")
+                                    mdx_lines.append(f"                </div>")
+                                
+                                if len(cls['methods']) > 5:
+                                    mdx_lines.append(f"                <p className='text-sm text-muted-foreground'>... and {len(cls['methods']) - 5} more methods</p>")
+                                
+                                mdx_lines.append("              </div>")
+                                mdx_lines.append("            </div>")
+                            
+                            if cls['properties']:
+                                mdx_lines.append("            <div>")
+                                mdx_lines.append("              <h6 className='font-semibold mb-2'>Properties</h6>")
+                                mdx_lines.append("              <div className='space-y-1'>")
+                                for prop in cls['properties']:
+                                    mdx_lines.append(f"                <code className='text-sm'>{prop['name']}</code>")
+                                mdx_lines.append("              </div>")
+                                mdx_lines.append("            </div>")
+                            
+                            mdx_lines.append("          </div>")
+                        
+                        mdx_lines.append("        </CardContent>")
+                        mdx_lines.append("      </Card>")
+                
+                mdx_lines.append("    </div>")
+                mdx_lines.append("  </TabsContent>")
+            
+            # Functions tab (keeping existing implementation)
+            if any(module['functions'] for module in package['modules']):
+                mdx_lines.append("  <TabsContent value='functions'>")
+                mdx_lines.append("    <div className='space-y-4'>")
+                
+                for module in package['modules']:
+                    for func in module['functions']:
+                        mdx_lines.append("      <Card>")
+                        mdx_lines.append("        <CardHeader>")
+                        mdx_lines.append(f"          <CardTitle className='flex items-center gap-2'>")
+                        mdx_lines.append(f"            ⚡ <code>{func['name']}()</code>")
+                        if func['is_async']:
+                            mdx_lines.append(f"            <Badge variant='secondary'>async</Badge>")
+                        if func['is_private']:
+                            mdx_lines.append(f"            <Badge variant='outline'>private</Badge>")
+                        elif func['is_protected']:
+                            mdx_lines.append(f"            <Badge variant='outline'>protected</Badge>")
+                        mdx_lines.append(f"          </CardTitle>")
+                        
+                        if func['docstring']['summary']:
+                            mdx_lines.append(f"          <CardDescription>{_escape_mdx(func['docstring']['summary'])}</CardDescription>")
+                        
+                        mdx_lines.append("        </CardHeader>")
+                        mdx_lines.append("        <CardContent>")
+                        
+                        # Function signature
+                        mdx_lines.append("          <div className='mb-4'>")
+                        mdx_lines.append("            <h6 className='font-semibold mb-2'>Signature</h6>")
+                        mdx_lines.append(f"            <pre className='bg-muted p-2 rounded text-sm overflow-x-auto'><code>{_escape_mdx(func['signature'])}</code></pre>")
+                        mdx_lines.append("          </div>")
+                        
+                        if func['docstring']['description']:
+                            mdx_lines.append(f"          <p className='mb-4'>{_escape_mdx(func['docstring']['description'])}</p>")
+                        
+                        # Parameters and return info
+                        if func['docstring']['parameters'] or func['docstring']['returns']:
+                            mdx_lines.append("          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>")
+                            
+                            if func['docstring']['parameters']:
+                                mdx_lines.append("            <div>")
+                                mdx_lines.append("              <h6 className='font-semibold mb-2'>Parameters</h6>")
+                                mdx_lines.append("              <div className='space-y-2'>")
+                                for param in func['docstring']['parameters']:
+                                    mdx_lines.append(f"                <div>")
+                                    mdx_lines.append(f"                  <code className='text-sm font-medium'>{param['name']}</code>")
+                                    if param['type_hint']:
+                                        mdx_lines.append(f"                  <Badge variant='outline' className='ml-2 text-xs'>{param['type_hint']}</Badge>")
+                                    if param['description']:
+                                        mdx_lines.append(f"                  <p className='text-sm text-muted-foreground mt-1'>{_escape_mdx(param['description'])}</p>")
+                                    mdx_lines.append(f"                </div>")
+                                mdx_lines.append("              </div>")
+                                mdx_lines.append("            </div>")
+                            
+                            if func['docstring']['returns']:
+                                mdx_lines.append("            <div>")
+                                mdx_lines.append("              <h6 className='font-semibold mb-2'>Returns</h6>")
+                                if func['docstring']['returns']['type_hint']:
+                                    mdx_lines.append(f"              <Badge variant='outline' className='mb-2'>{func['docstring']['returns']['type_hint']}</Badge>")
+                                if func['docstring']['returns']['description']:
+                                    mdx_lines.append(f"              <p className='text-sm'>{_escape_mdx(func['docstring']['returns']['description'])}</p>")
+                                mdx_lines.append("            </div>")
+                            
+                            mdx_lines.append("          </div>")
+                        
+                        mdx_lines.append("        </CardContent>")
+                        mdx_lines.append("      </Card>")
+                
+                mdx_lines.append("    </div>")
+                mdx_lines.append("  </TabsContent>")
+            
+            mdx_lines.append("</Tabs>")
+        
+        mdx_lines.append("")
+    
+    # Footer
+    mdx_lines.append("---")
+    mdx_lines.append("")
+    mdx_lines.append("<Alert>")
+    mdx_lines.append("  <AlertDescription>")
+    mdx_lines.append("    📝 This documentation was automatically generated from Python source code with imported API analysis.<br/>")
+    mdx_lines.append(f"    🕒 Generated on {documentation['analyzed_at']}")
+    mdx_lines.append("  </AlertDescription>")
+    mdx_lines.append("</Alert>")
+    
+    return '\n'.join(mdx_lines)
+
+def _escape_mdx(text: str) -> str:
+    """Escape special characters for MDX"""
+    if not text:
+        return ""
+    
+    # Escape curly braces and other MDX special characters
+    text = text.replace('{', '\\{').replace('}', '\\}')
+    text = text.replace('<', '&lt;').replace('>', '&gt;')
+    
+    # Handle backticks in text
+    if '`' in text:
+        text = text.replace('`', '\\`')
+    
+    return text
+
+def main():
+    """Main entry point for the script"""
+    parser = argparse.ArgumentParser(
+        description='🐍 Python API Documentation Generator - Analyze Python repositories and generate beautiful MDX documentation with imported API analysis',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s /path/to/my/python/project
+  %(prog)s ./my_package --output my_api_docs.mdx
+  %(prog)s ~/projects/flask-app --format json --verbose
+  %(prog)s /usr/local/lib/python3.9/site-packages/requests --format mdx
+
+This tool analyzes Python code and generates comprehensive documentation including:
+• 📦 Package structure and metadata
+• 📄 Module docstrings and imports  
+• 🏗️ Class inheritance and methods
+• ⚡ Function signatures and parameters
+• 📦 Imported APIs with full documentation (like pydoc/pdoc/autodoc)
+• 🎨 Interactive MDX components for modern documentation sites
+        """
+    )
+    
+    parser.add_argument('repo_path', help='Path to the Python repository or package')
+    parser.add_argument('-o', '--output', help='Output file path (default: auto-generated)', default=None)
+    parser.add_argument('-f', '--format', choices=['json', 'mdx'], default='mdx', 
+                       help='Output format: json for data, mdx for documentation (default: mdx)')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
+    
+    args = parser.parse_args()
+    
+    # Print header
+    if args.verbose:
+        print("🐍 Python API Documentation Generator")
+        print("=" * 40)
+    
+    try:
+        repo_path = Path(args.repo_path).resolve()
+        
+        if not repo_path.exists():
+            print(f"❌ Error: Repository path does not exist: {repo_path}")
+            sys.exit(1)
+        
+        if args.verbose:
+            print(f"🔍 Analyzing repository: {repo_path}")
+            print("📦 Following imports and extracting API documentation...")
+        
+        analyzer = PythonDocAnalyzer(str(repo_path))
+        documentation = analyzer.analyze_repository()
+        
+        # Generate output filename if not provided
+        if not args.output:
+            repo_name = repo_path.name
+            if args.format == 'mdx':
+                args.output = f"{repo_name}_api_docs.mdx"
+            else:
+                args.output = f"{repo_name}_api_docs.json"
+        elif not args.output.endswith(f'.{args.format}'):
+            args.output = f"{args.output}.{args.format}"
+        
+        if args.verbose:
+            print(f"📝 Generating {args.format.upper()} documentation...")
+        
+        if args.format == 'json':
+            with open(args.output, 'w', encoding='utf-8') as f:
+                json.dump(documentation, f, indent=2, ensure_ascii=False)
+        else:
+            mdx_content = generate_mdx_docs(documentation)
+            with open(args.output, 'w', encoding='utf-8') as f:
+                f.write(mdx_content)
+        
+        # Print success message with summary
+        summary = documentation['summary']
+        print(f"\n✅ {args.format.upper()} documentation generated successfully!")
+        print(f"📄 Output file: {args.output}")
+        
+        if args.verbose:
+            print(f"\n📊 Documentation Summary:")
+            print(f"   📦 Packages: {summary['total_packages']}")
+            print(f"   📄 Modules: {summary['total_modules']}")
+            print(f"   🏗️  Classes: {summary['total_classes']}")
+            print(f"   ⚡ Functions: {summary['total_functions']}")
+            print(f"   🔧 Methods: {summary['total_methods']}")
+            print(f"   📦 Imported APIs: {summary['total_imported_apis']}")
+            
+            if summary['package_names']:
+                print(f"\n📦 Found packages: {', '.join(summary['package_names'])}")
+        
+        if args.format == 'mdx':
+            print(f"\n💡 You can now use this MDX file in your documentation site!")
+            print(f"   The documentation includes imported APIs with full docstrings!")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        if args.verbose:
+            traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
